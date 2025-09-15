@@ -17,11 +17,15 @@ ENV ROBOT_IP=${ROBOT_IP}
 ENV NUC_IP=${NUC_IP}
 
 # base system installations
-RUN apt-get update && \
-    apt-get install -y software-properties-common build-essential sudo git curl wget python3-pip libspdlog-dev \
-    libeigen3-dev lsb-release ffmpeg libsm6 libxext6 && \
-    apt-get upgrade -y 
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Seoul
 
+RUN apt-get update && \
+    apt-get install -y tzdata && \
+    apt-get install -y software-properties-common build-essential sudo git curl wget python3-pip libspdlog-dev \
+    libeigen3-dev lsb-release ffmpeg libsm6 libxext6 zstd && \
+    apt-get upgrade -y && \
+    rm -rf /var/lib/apt/lists/*
 # install latest cmake version
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
     apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \  
