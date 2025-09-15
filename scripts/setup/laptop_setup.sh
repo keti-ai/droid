@@ -14,8 +14,8 @@ function confirm_devices {
     fi
 }
 
-# print out nice ascii art
-ascii=$(cat ./intro.txt)
+# print out nice ascii art (optional)
+ascii=$(cat "$(git rev-parse --show-toplevel)/scripts/setup/intro.txt" 2>/dev/null || echo "")
 echo "$ascii"
 
 echo "Welcome to the DROID setup process."
@@ -33,43 +33,49 @@ if [ "$first_time" = "yes" ]; then
 	# ensure local files are up to date and git lfs is configured
 	echo -e "Ensure all submodules are cloned and oculus_reader APK file pulled locally \n"
 
-	eval "$(ssh-agent -s)"
-	ssh-add /home/robot/.ssh/id_ed25519
-	curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash
-	apt update && apt install -y git-lfs
+  eval "$(ssh-agent -s)" || true
+  # ssh-add /home/robot/.ssh/id_ed25519 || true
+  curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
+  sudo apt-get update -y && sudo apt-get install -y git-lfs
 	git lfs install # has to be run only once on a single user account
-	cd $ROOT_DIR && git submodule update --recursive --remote --init
-	
+  cd "$ROOT_DIR" && git submodule sync --recursive && git submodule update --init --recursive
 	# install docker
 	echo -e "Install docker \n"
 
-	apt-get update
-	apt-get install ca-certificates curl gnupg
-	install -m 0755 -d /etc/apt/keyrings
+  sudo apt-get update -y
+  sudo apt-get install -y ca-certificates curl gnupg
+  sudo install -m 0755 -d /etc/apt/keyrings
 	curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-	chmod a+r /etc/apt/keyrings/docker.gpg
+	sudo chmod a+r /etc/apt/keyrings/docker.gpg
 	echo \
 	  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
 	  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
 	  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-	apt-get update
-	apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+	sudo apt-get update
+	sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 	# install and configure nvidia container toolkit
 	echo -e "Install Nvidia container toolkit \n"
 
-	distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
-	      && curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
-	      && curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
-		    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-		    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-	apt-get update
-	apt-get install -y nvidia-container-toolkit
-	nvidia-ctk runtime configure --runtime=docker
-	systemctl restart docker
+	distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+  curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+    sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  curl -fsSL "https://nvidia.github.io/libnvidia-container/${distribution}/libnvidia-container.list" | \
+    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list >/dev/null
+  sudo apt-get update -y
+  sudo apt-get install -y nvidia-container-toolkit
+  sudo nvidia-ctk runtime configure --runtime=docker
+  sudo systemctl restart docker
 
 else
 	echo -e "\nWelcome back!\n"
+fi
+# ADB는 아래에서 무조건 쓰므로 선 설치 (질문 이전)
+if ! command -v adb >/dev/null 2>&1; then
+  sudo apt-get update -y
+  sudo apt-get install -y android-tools-adb android-sdk-platform-tools-common
+  adb start-server || true
 fi
 
 read -p "Have you installed the oculus_reader APK file on your Oculus Quest 2? (yes/no): " first_time
@@ -81,16 +87,16 @@ if [ "$first_time" = "no" ]; then
 
 	#usermod -aG plugdev $LOGNAME
 	#newgrp plugdev
-	apt install -y android-tools-adb android-sdk-platform-tools-common
-	adb start-server
+  # 이미 위에서 설치/시작했지만 한 번 더 안전하게
+  sudo apt-get install -y android-tools-adb android-sdk-platform-tools-common
+  adb start-server || true
 
 	read -p "Connect your Oculus Quest 2 via USB-C, and approve USB debugging within device. Confirm with y when complete? (y/n): " confirmation
 	    
-	if [ "$confirmation" != "y" ] && [ "$confirmation" != "Y" ]; then
-		return 1
-	else
-		return exit 1
-	fi
+  if [ "$confirmation" != "y" ] && [ "$confirmation" != "Y" ]; then
+    echo "Not confirmed."
+    exit 1
+  fi
 
 
 	# Retry loop
@@ -145,7 +151,7 @@ fi
 echo -e "Set Docker Xauth for x11 forwarding \n"
 
 export DOCKER_XAUTH=/tmp/.docker.xauth
-rm $DOCKER_XAUTH
+rm -f $DOCKER_XAUTH
 touch $DOCKER_XAUTH
 xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f $DOCKER_XAUTH nmerge -
 
@@ -177,10 +183,11 @@ done
 echo "You've selected: $interface_name"
 
 # Add and configure the static IP connection
-nmcli connection delete "laptop_static"
-nmcli connection add con-name "laptop_static" ifname "$interface_name" type ethernet
-nmcli connection modify "laptop_static" ipv4.method manual ipv4.address $LAPTOP_IP/24
-nmcli connection up "laptop_static"
+sudo nmcli connection delete "laptop_static" 2>/dev/null || true
+sudo nmcli connection add con-name "laptop_static" ifname "$interface_name" type ethernet
+sudo nmcli connection modify "laptop_static" ipv4.method manual ipv4.address $LAPTOP_IP/24
+sudo nmcli connection up "laptop_static" || sudo nmcli device connect "$interface_name" || true
+
 
 echo "Static IP configuration complete for interface $interface_name."
 
@@ -188,7 +195,7 @@ echo "Static IP configuration complete for interface $interface_name."
 read -p "Please plug in and out each camera connected via usb and press enter once done?: " _
 
 echo "Starting ADB server on host machine"
-adb kill-server
+adb kill-server || true
 adb -a nodaemon server start &> /dev/null &
 
 # Retry loop
