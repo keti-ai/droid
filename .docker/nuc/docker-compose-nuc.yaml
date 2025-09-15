@@ -2,7 +2,7 @@ version: "3"
 
 services: 
   setup_nuc:
-    image: ghcr.io/droid-dataset/droid_nuc:${ROBOT_TYPE}
+    #image: ghcr.io/droid-dataset/droid_nuc:${ROBOT_TYPE}
     environment:
       ROBOT_TYPE: ${ROBOT_TYPE}
       LIBFRANKA_VERSION: ${LIBFRANKA_VERSION}
