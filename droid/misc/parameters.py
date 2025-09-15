@@ -5,7 +5,7 @@ from cv2 import aruco
 nuc_ip = "172.16.0.4"
 robot_ip = "172.16.0.2"
 laptop_ip = "172.16.0.1"
-sudo_password = ""
+sudo_password = "keti1234"
 robot_type = "fr3"  # 'panda' or 'fr3'
 robot_serial_number = "309969-2543204"
 
