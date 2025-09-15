@@ -2,7 +2,6 @@
 set -euo pipefail
 trap 'echo "[ERROR] ${BASH_SOURCE[0]}:$LINENO step failed"; exit 1' ERR
 
-# --- pretty banner (optional) ---
 [[ -f ./intro.txt ]] && cat ./intro.txt || true
 echo "Welcome to the DROID setup process."
 
@@ -11,67 +10,60 @@ read -p "Is this your first time setting up the machine? (yes/no): " first_time
 if [[ "${first_time}" == "yes" ]]; then
   echo "Great! Let's proceed with the setup."
 
-  # --- submodules ---
   echo "Repulling all submodules."
-  # SSH 키 강제 추가는 제거 (HTTPS 사용 권장)
-  # read -p "Enter the user whose ssh credentials will be used: " USERNAME
-  # eval "$(ssh-agent -s)"; ssh-add "/home/${USERNAME}/.ssh/id_ed25519" || true
-
   ROOT_DIR="$(git rev-parse --show-toplevel)"
   cd "${ROOT_DIR}"
   git submodule sync --recursive
   git submodule update --init --recursive
 
-  # --- docker install ---
   echo -e "\n[1/4] Install Docker & Compose\n"
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update -y
-  apt-get install -y ca-certificates curl gnupg
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  chmod a+r /etc/apt/keyrings/docker.gpg
+  sudo apt-get update -y
+  sudo apt-get install -y ca-certificates curl gnupg
+  sudo install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  sudo chmod a+r /etc/apt/keyrings/docker.gpg
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
-    > /etc/apt/sources.list.d/docker.list
-  apt-get update -y
-  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-  systemctl enable docker
+    | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+  sudo apt-get update -y
+  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  sudo systemctl enable docker
 
-  # --- realtime / performance (Jetson/Orin은 RT 커널 스킵) ---
   echo -e "\n[2/4] Kernel realtime / performance tuning\n"
   . /etc/os-release || true
+  # Jetson/Orin에선 RT 커널 스킵
   if [[ "${ID:-}" == "ubuntu" && "${VERSION_CODENAME:-}" != "focal" && "${VERSION_CODENAME:-}" != "jammy" && -n "${UBUNTU_PRO_TOKEN:-}" ]]; then
-    # (일반 x86 Ubuntu 22.04 등에서만 시도)
-    apt-get update -y
-    apt-get install -y ubuntu-advantage-tools
-    pro attach "${UBUNTU_PRO_TOKEN}" || true
-    pro enable realtime-kernel || true
+    sudo apt-get update -y
+    sudo apt-get install -y ubuntu-advantage-tools
+    sudo pro attach "${UBUNTU_PRO_TOKEN}" || true
+    sudo pro enable realtime-kernel || true
   else
     echo "Skipping Ubuntu Pro RT kernel (Jetson/Ubuntu ${VERSION_CODENAME:-unknown})."
   fi
 
-  # --- cpu frequency scaling ---
   echo -e "\n[3/4] Set CPU governor\n"
-  apt-get install -y cpufrequtils
-  systemctl disable ondemand || true
-  systemctl enable cpufrequtils || true
-  bash -lc 'echo "GOVERNOR=performance" > /etc/default/cpufrequtils'
-  systemctl daemon-reload && systemctl restart cpufrequtils || true
+  sudo apt-get install -y cpufrequtils
+  sudo systemctl disable ondemand || true
+  sudo systemctl enable cpufrequtils || true
+  echo "GOVERNOR=performance" | sudo tee /etc/default/cpufrequtils >/dev/null
+  sudo systemctl daemon-reload && sudo systemctl restart cpufrequtils || true
 
-  # Jetson(Orin) 성능 고정 (있으면 실행)
-  command -v nvpmodel &>/dev/null && nvpmodel -m 0 || true
-  command -v jetson_clocks &>/dev/null && jetson_clocks || true
+  command -v nvpmodel &>/dev/null && sudo nvpmodel -m 0 || true
+  command -v jetson_clocks &>/dev/null && sudo jetson_clocks || true
 else
   echo -e "\nWelcome back!\n"
 fi
 
-# --- load parameters ---
 echo -e "\n[4/4] Load parameters from parameters.py\n"
 PARAMETERS_FILE="$(git rev-parse --show-toplevel)/droid/misc/parameters.py"
 awk -F'[[:space:]]*=[[:space:]]*' \
   '/^[[:space:]]*([[:alnum:]_]+)[[:space:]]*=/ && $1 != "ARUCO_DICT" { gsub("\"", "", $2); print "export " $1 "=" $2 }' \
   "${PARAMETERS_FILE}" > /tmp/droid_env.sh
+# 환경변수 일괄 export
+set -a
 # shellcheck disable=SC1091
 source /tmp/droid_env.sh
+set +a
 rm -f /tmp/droid_env.sh
 
 export ROOT_DIR
@@ -92,37 +84,38 @@ else
   export LIBFRANKA_VERSION=0.10.0
 fi
 
-# --- build control server container (optional) ---
 read -p "Do you want to rebuild the container image? (yes/no): " rebuild
 if [[ "${rebuild}" == "yes" ]]; then
   echo -e "\n[Build] control server container\n"
   DOCKER_COMPOSE_DIR="${ROOT_DIR}/.docker/nuc"
   DOCKER_COMPOSE_FILE="${DOCKER_COMPOSE_DIR}/docker-compose-nuc.yaml"
   cd "${DOCKER_COMPOSE_DIR}"
-  docker compose -f "${DOCKER_COMPOSE_FILE}" build
+  # 첫 실행은 sudo docker 권장 (그 뒤 docker 그룹 추가 가능)
+  sudo docker compose -f "${DOCKER_COMPOSE_FILE}" build
 fi
 
-# --- static IP ---
 echo -e "\n[Net] set static IP\n"
 echo "Select an Ethernet interface to set a static IP for:"
-
 interfaces=$(ip -o link show | awk -F': ' '/(en|eth|ens|eno|enp)/{print $2}')
 select interface_name in $interfaces; do
   [[ -n "${interface_name:-}" ]] && break || echo "Invalid selection."
 done
 echo "You've selected: ${interface_name}"
 
-# 안전하게 기존 연결 삭제(없어도 무시)
-nmcli connection delete "nuc_static" 2>/dev/null || true
-nmcli connection add con-name "nuc_static" ifname "${interface_name}" type ethernet
-# 게이트웨이/DNS 유추 (동일 /24 가정, GW = x.y.z.1)
-gw_guess="$(echo "${NUC_IP}" | awk -F. '{print $1"."$2"."$3".1"}')"
-nmcli connection modify "nuc_static" ipv4.method manual ipv4.addresses "${NUC_IP}/24" ipv4.gateway "${gw_guess}" ipv4.dns "8.8.8.8,1.1.1.1" ipv6.method ignore
-nmcli connection up "nuc_static" || nmcli device connect "${interface_name}" || true
+sudo nmcli connection delete "nuc_static" 2>/dev/null || true
+sudo nmcli connection add con-name "nuc_static" ifname "${interface_name}" type ethernet
+gw_guess="$(echo "${NUC_IP}" | awk -FS. '{printf "%s.%s.%s.1",$1,$2,$3}')"
+sudo nmcli connection modify "nuc_static" \
+  ipv4.method manual ipv4.addresses "${NUC_IP}/24" ipv4.gateway "${gw_guess}" \
+  ipv4.dns "8.8.8.8,1.1.1.1" ipv6.method ignore
+sudo nmcli connection up "nuc_static" || sudo nmcli device connect "${interface_name}" || true
 echo "Static IP configuration complete for interface ${interface_name}."
 
-# --- run control server container ---
 echo -e "\n[Run] control server\n"
 DOCKER_COMPOSE_FILE="$(git rev-parse --show-toplevel)/.docker/nuc/docker-compose-nuc.yaml"
-docker compose -f "${DOCKER_COMPOSE_FILE}" up -d
+sudo docker compose -f "${DOCKER_COMPOSE_FILE}" up -d
 echo "[DONE] NUC/Orin setup complete."
+
+# (선택) 이후 무sudo로 docker 쓰고 싶다면:
+# sudo usermod -aG docker "$USER"
+# newgrp docker
