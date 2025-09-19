@@ -27,6 +27,10 @@ RUN apt-get update && \
     doxygen graphviz \
     libprotobuf-dev protobuf-compiler \
     libassimp-dev \
+      liburdfdom-dev liburdfdom-headers-dev \
+    libpoco-dev \
+    openmpi-bin libopenmpi-dev \
+    patchelf \
     && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 # -------- CMake 최신 --------
@@ -53,23 +57,31 @@ WORKDIR ${NUC_POLYMETIS_DIR}
 
 RUN conda config --set always_yes yes \
  && conda config --set changeps1 false \
- && conda config --env --add channels conda-forge \
- && conda config --env --set channel_priority flexible \
+ && conda config --env --set channel_priority strict \
+ && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main \
+ && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r \
  && conda env create -f arm_polymetis_env.yml
+
 
 # conda run 기본 쉘
 SHELL ["conda", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
 
-# -------- (중요) Jetson용 PyTorch 설치 --------
-# 사용 중인 JetPack/L4T 버전에 맞는 wheel로 교체하세요.
-# 예시1: JetPack 5.x (L4T r35.x)에서 torch 2.0 계열
-# pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu118 torch==2.0.1+nv23.06 torchvision==0.15.2+nv23.06
-# 예시2: JetPack 6.x (L4T r36.x)에서 torch 2.2/2.3 계열
-# pip install --no-cache-dir torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu121
-# (환경에 맞는 공식 Jetson wheel/인덱스를 사용하세요)
+RUN pip install --upgrade pip==23.3.2
 
-# 일단 빌드가 막히지 않게 placeholder로 CPU판 설치(추후 교체 권장)
-RUN python -m pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cpu || true
+RUN pip install \
+    grpcio==1.56.2 \
+    pybullet==3.2.6 \
+    mujoco==3.1.6 \
+    hydra-core==1.0.6 \
+    importlib-resources==5.7.1 \
+    plotly dash pymodbus==2.5.3
+
+# -------- (중요) Jetson용 PyTorch 설치 --------
+RUN pip install --upgrade pip==23.3.2 && \
+    pip install --no-cache-dir \
+      https://developer.download.nvidia.com/compute/redist/jp/v50/pytorch/torch-1.12.0a0+2c916ef.nv22.3-cp38-cp38-linux_aarch64.whl \
+      torchvision==0.13.0 \
+      torchaudio==0.12.1
 
 # -------- Polymetis 파이썬 설치 --------
 # (setup.cfg/pyproject.toml에 맞춰 파이썬 파트만 설치)
