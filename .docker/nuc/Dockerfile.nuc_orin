@@ -1,0 +1,108 @@
+# Jetson Orin (aarch64), no sim deps, Polymetis + Franka only
+FROM ubuntu:20.04
+
+# -------- Build args --------
+ARG ROBOT_TYPE=${ROBOT_TYPE}
+ARG LIBFRANKA_VERSION=${LIBFRANKA_VERSION}
+ARG ROBOT_IP=${ROBOT_IP}
+ARG NUC_IP=${NUC_IP}
+ARG NUC_POLYMETIS_DIR=/app/droid/fairo/polymetis
+ARG NUC_ROBOT_CONFIG_DIR=/app/config/${ROBOT_TYPE}
+ARG NUC_POLYMETIS_CONFIG_DIR=${NUC_POLYMETIS_DIR}/polymetis/conf
+
+# -------- Runtime env --------
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Seoul
+ENV ROBOT_TYPE=${ROBOT_TYPE}
+ENV LIBFRANKA_VERSION=${LIBFRANKA_VERSION}
+ENV ROBOT_IP=${ROBOT_IP}
+ENV NUC_IP=${NUC_IP}
+
+# -------- Base packages --------
+RUN apt-get update && \
+    apt-get install -y tzdata software-properties-common build-essential sudo \
+    git curl wget python3-pip libspdlog-dev libeigen3-dev lsb-release ffmpeg \
+    libsm6 libxext6 zstd pkg-config ninja-build \
+    libyaml-cpp-dev liburdfdom-dev liburdfdom-headers-dev libpoco-dev \
+    doxygen graphviz \
+    libprotobuf-dev protobuf-compiler \
+    libassimp-dev \
+    && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
+# -------- CMake 최신 --------
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+      gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null \
+ && apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' \
+ && apt-get update && apt-get install -y cmake
+
+# -------- 프로젝트 복사 --------
+COPY . /app
+WORKDIR /app
+
+# -------- Miniconda (aarch64) --------
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh \
+    && mkdir -p /root/.conda \
+    && bash Miniconda3-latest-Linux-aarch64.sh -b \
+    && rm -f Miniconda3-latest-Linux-aarch64.sh
+ENV PATH=/root/miniconda3/bin:$PATH
+
+# -------- Conda 설정 & 환경 생성(ARM-친화 env) --------
+WORKDIR ${NUC_POLYMETIS_DIR}
+# 아래 env 파일은 답변 맨 아래에 있음(arm_polymetis_env.yml)
+# COPY arm_polymetis_env.yml ${NUC_POLYMETIS_DIR}/arm_polymetis_env.yml
+
+RUN conda config --set always_yes yes \
+ && conda config --set changeps1 false \
+ && conda config --env --add channels conda-forge \
+ && conda config --env --set channel_priority flexible \
+ && conda env create -f arm_polymetis_env.yml
+
+# conda run 기본 쉘
+SHELL ["conda", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
+
+# -------- (중요) Jetson용 PyTorch 설치 --------
+# 사용 중인 JetPack/L4T 버전에 맞는 wheel로 교체하세요.
+# 예시1: JetPack 5.x (L4T r35.x)에서 torch 2.0 계열
+# pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu118 torch==2.0.1+nv23.06 torchvision==0.15.2+nv23.06
+# 예시2: JetPack 6.x (L4T r36.x)에서 torch 2.2/2.3 계열
+# pip install --no-cache-dir torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu121
+# (환경에 맞는 공식 Jetson wheel/인덱스를 사용하세요)
+
+# 일단 빌드가 막히지 않게 placeholder로 CPU판 설치(추후 교체 권장)
+RUN python -m pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cpu || true
+
+# -------- Polymetis 파이썬 설치 --------
+# (setup.cfg/pyproject.toml에 맞춰 파이썬 파트만 설치)
+RUN pip install -e polymetis
+
+# -------- libfranka & Polymetis C++ 빌드 --------
+#   - apt로 깔아둔 Poco/Eigen/spdlog/yaml-cpp/urdfdom 사용
+RUN ./scripts/build_libfranka.sh ${LIBFRANKA_VERSION} && \
+    mkdir -p ./polymetis/build && cd ./polymetis/build && \
+    cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_FRANKA=ON -DBUILD_TESTS=ON -DBUILD_DOCS=ON && \
+    ninja
+
+# -------- 설정 파일 배치 --------
+WORKDIR /app
+RUN cp ${NUC_ROBOT_CONFIG_DIR}/franka_hardware.yaml ${NUC_POLYMETIS_CONFIG_DIR}/robot_client/franka_hardware.yaml && \
+    cp ${NUC_ROBOT_CONFIG_DIR}/franka_panda.yaml ${NUC_POLYMETIS_CONFIG_DIR}/robot_model/franka_panda.yaml
+
+# -------- 최상위 파이썬 패키지들 설치(선택) --------
+# (dm-robotics-* 는 의존성 무시 옵션이므로, 필요한 경우에만 유지)
+RUN pip3 install -e . && \
+    pip3 install dm-robotics-moma==0.5.0 --no-deps && \
+    pip3 install dm-robotics-transformations==0.5.0 --no-deps && \
+    pip3 install dm-robotics-agentflow==0.5.0 --no-deps && \
+    pip3 install dm-robotics-geometry==0.5.0 --no-deps && \
+    pip3 install dm-robotics-manipulation==0.5.0 --no-deps && \
+    pip3 install dm-robotics-controllers==0.5.0 --no-deps || true
+
+# -------- miniconda 경로 치환 --------
+RUN find /app/droid/franka -type f -name "launch_*.sh" -exec sed -i 's/anaconda/miniconda/g' {} \; && \
+    find /app/scripts/server -type f -name "launch_server.sh" -exec sed -i 's/anaconda/miniconda/g' {} \; && \
+    find /app/droid/franka -type f -name "launch_*.sh" -exec sed -i 's|~|/root|g' {} \; && \
+    find /app/scripts/server -type f -name "launch_server.sh" -exec sed -i 's|~|/root|g' {} \;
+
+# -------- 엔트리 포인트 --------
+RUN chmod +x /app/scripts/server/launch_server.sh
+ENTRYPOINT ["/app/scripts/server/launch_server.sh"]
