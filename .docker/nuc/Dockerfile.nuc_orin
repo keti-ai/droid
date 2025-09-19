@@ -19,10 +19,7 @@ ENV ROBOT_IP=${ROBOT_IP}
 ENV NUC_IP=${NUC_IP}
 
 # -------- Base packages --------
-RUN apt-get purge -y cmake && \
-    wget https://cmake.org/files/v3.25/cmake-3.25.3-linux-aarch64.tar.gz && \
-    tar -zxvf cmake-3.25.3-linux-aarch64.tar.gz -C /usr/local --strip-components=1 && \
-    rm cmake-3.25.3-linux-aarch64.tar.gz
+
 
 RUN apt-get update && \
     apt-get install -y tzdata software-properties-common build-essential sudo \
@@ -38,11 +35,15 @@ RUN apt-get update && \
     patchelf \
     && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
+RUN apt-get purge -y cmake && \
+    wget https://cmake.org/files/v3.25/cmake-3.25.3-linux-aarch64.tar.gz && \
+    tar -zxvf cmake-3.25.3-linux-aarch64.tar.gz -C /usr/local --strip-components=1 && \
+    rm cmake-3.25.3-linux-aarch64.tar.gz
 # -------- CMake 최신 --------
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null \
- && apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' \
- && apt-get update && apt-get install -y cmake
+#RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+#      gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null \
+# && apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' \
+# && apt-get update && apt-get install -y cmake
 
 # -------- 프로젝트 복사 --------
 COPY . /app
