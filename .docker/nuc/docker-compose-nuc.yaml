@@ -15,7 +15,7 @@ services:
       - ${ROOT_DIR}/config/${ROBOT_TYPE}/franka_panda.yaml:/app/droid/fairo/polymetis/polymetis/conf/robot_model/franka_panda.yaml
     build: 
       context: ../../
-      dockerfile: .docker/nuc/Dockerfile.nuc
+      dockerfile: .docker/nuc/Dockerfile.nuc_orin
       args:
         ROBOT_TYPE: ${ROBOT_TYPE}
         LIBFRANKA_VERSION: ${LIBFRANKA_VERSION}
