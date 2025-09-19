@@ -1,39 +1,24 @@
+# /app/droid/fairo/polymetis/arm_polymetis_env.yml
 name: polymetis-local
 channels:
   - conda-forge
+  - defaults
 dependencies:
-  # Python 버전: Polymetis 호환/Jetson wheel 구하기 쉬운 3.8 권장
-  - python=3.8
-
-  # 과학계열 기본
-  - numpy=1.23
-  - scipy
-  - pandas
-  - cython
-
-  # 로보틱스 수학/기하 (ARM 빌드 있는 버전만)
-  - pinocchio>=2.6,<3.0
-  - hpp-fcl>=1.7.0
-
-  # 유틸
+  - python=3.8.*       # ★ 반드시 3.8 고정 (cp38)
   - pip
-  - tqdm
-  - pytest
-  - pytest-benchmark=4.0.0
-
-  # (시스템 라이브러리들은 apt로 설치)
-  # - spdlog, yaml-cpp, urdfdom, eigen, poco 등은 apt 사용
-
-  # grpc/protobuf는 pip로 관리(버전 충돌 회피)
-  - pip:
-      - grpcio>=1.54
-      - protobuf<3.21
-      - withbullet
-      - hydra-core>=1.2
-      - omegaconf>=2.2
-      - plotly
-      - dash
-      - sphinx
-      - myst-parser
-      - sphinx-copybutton
-      - sphinx-book-theme
+  - cmake
+  - eigen=3.3
+  - ninja
+  - pkg-config
+  - yaml-cpp
+  - urdfdom
+  - urdfdom_headers
+  - poco
+  - assimp
+  - openmpi
+  - doxygen
+  - graphviz
+  - zstd
+  - libprotobuf
+  - protobuf
+  # pip 패키지는 비워두거나 최소화 (아래 RUN pip ...에서 설치)
