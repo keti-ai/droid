@@ -1,7 +1,8 @@
 FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
 
 # build args
-ARG ROBOT_TYPE=${ROBOT_TYPE}
+# ARG ROBOT_TYPE=${ROBOT_TYPE}
+ARG ROBOT_TYPE=fr3
 ARG LIBFRANKA_VERSION=${LIBFRANKA_VERSION}
 ARG ROBOT_IP=${ROBOT_IP}
 ARG NUC_IP=${NUC_IP}
@@ -35,13 +36,20 @@ RUN wget \
     && mkdir /root/.conda \
     && bash Miniconda3-latest-Linux-x86_64.sh -b \
     && rm -f Miniconda3-latest-Linux-x86_64.sh
-RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
-    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
-ENV PATH /root/miniconda3/bin:$PATH
+# (수정)
+ENV PATH=/root/miniconda3/bin:$PATH
+#RUN conda --version && conda update -y conda
+RUN conda --version
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+RUN conda config --system --remove-key channels || true \
+ && conda config --system --add channels conda-forge \
+ && conda config --system --set channel_priority strict \
+ && conda config --system --set always_yes true
 
-# create conda environment
-RUN conda create -y -n "robot" python=3.7
-SHELL ["conda", "run", "-n", "robot", "/bin/bash", "-c"]
+RUN conda create -n robot python=3.7
+SHELL ["bash", "-lc"]
+RUN source activate robot && python -V && pip -V
 
 # install the zed sdk
 ARG UBUNTU_RELEASE_YEAR=22
@@ -61,24 +69,27 @@ RUN apt-get update -y || true ; apt-get install --no-install-recommends lsb-rele
     ln -sf /lib/x86_64-linux-gnu/libusb-1.0.so.0 /usr/lib/x86_64-linux-gnu/libusb-1.0.so && \
     rm ZED_SDK_Linux_Ubuntu${UBUNTU_RELEASE_YEAR}.run && \
     rm -rf /var/lib/apt/lists/*
-RUN conda install -c conda-forge libstdcxx-ng requests # required for pyzed
-RUN python /usr/local/zed/get_python_api.py && python -m pip install --ignore-installed /app/pyzed-4.0-cp37-cp37m-linux_x86_64.whl
+#RUN conda install -c conda-forge libstdcxx-ng requests # required for pyzed
+RUN conda install -n robot libstdcxx-ng requests
+
+#RUN source activate robot && python /usr/local/zed/get_python_api.py && python -m pip install --ignore-installed /app/pyzed-4.0-cp37-cp37m-linux_x86_64.whl
+RUN source activate robot \
+ && python /usr/local/zed/get_python_api.py \
+ && python -m pip install --ignore-installed /app/pyzed-4.0-cp37-cp37m-linux_x86_64.whl
 
 # install oculus reader
-RUN add-apt-repository universe && \
-    apt-get update -y && \ 
-    apt-get install -y android-tools-fastboot
-RUN pip3 install -e $NUC_OCULUS_DIR && \
-    apt install -y android-tools-adb
+RUN apt-get update -y && apt-get install -y android-tools-fastboot android-tools-adb
+RUN source activate robot && pip install -e $NUC_OCULUS_DIR
 
 # python environment setup
-RUN pip3 install -e . && \
-    pip3 install dm-robotics-moma==0.5.0 --no-deps && \
-    pip3 install dm-robotics-transformations==0.5.0 --no-deps && \
-    pip3 install dm-robotics-agentflow==0.5.0 --no-deps && \
-    pip3 install dm-robotics-geometry==0.5.0 --no-deps && \
-    pip3 install dm-robotics-manipulation==0.5.0 --no-deps && \
-    pip3 install dm-robotics-controllers==0.5.0 --no-deps
+RUN source activate robot && pip install -e . \
+ && pip install "numpy<2" "gym==0.26.*" \
+ && pip install dm-robotics-moma==0.5.0 --no-deps \
+ && pip install dm-robotics-transformations==0.5.0 --no-deps \
+ && pip install dm-robotics-agentflow==0.5.0 --no-deps \
+ && pip install dm-robotics-geometry==0.5.0 --no-deps \
+ && pip install dm-robotics-manipulation==0.5.0 --no-deps \
+ && pip install dm-robotics-controllers==0.5.0 --no-deps
 
 
 # using miniconda instead of anaconda so overwrite sh scripts
@@ -89,9 +100,21 @@ RUN find /app/scripts/server -type f -name "launch_server.sh" -exec sed -i 's/an
 RUN find /app/droid/franka -type f -name "launch_*.sh" -exec sed -i 's|~|/root|g' {} \;
 RUN find /app/scripts/server -type f -name "launch_server.sh" -exec sed -i 's|~|/root|g' {} \;
 
+RUN ls -la /app/droid/fairo || true && find /app/droid/fairo -maxdepth 3 -type d | sort | sed -n '1,200p'
+
 # set polymetis config files
-RUN cp ${NUC_ROBOT_CONFIG_DIR}/franka_hardware.yaml ${NUC_POLYMETIS_CONFIG_DIR}/robot_client/franka_hardware.yaml && \
-    cp ${NUC_ROBOT_CONFIG_DIR}/franka_panda.yaml ${NUC_POLYMETIS_CONFIG_DIR}/robot_model/franka_panda.yaml
+RUN set -e; \
+    POLY_BASE="${NUC_POLYMETIS_DIR}"; \
+    CONF_A="${POLY_BASE}/polymetis/conf"; \
+    CONF_B="${POLY_BASE}/conf"; \
+    if [ -d "$CONF_A" ]; then POLY_CONF="$CONF_A"; \
+    elif [ -d "$CONF_B" ]; then POLY_CONF="$CONF_B"; \
+    else POLY_CONF="$CONF_A"; mkdir -p "$POLY_CONF"; fi; \
+    mkdir -p "$POLY_CONF/robot_client" "$POLY_CONF/robot_model"; \
+    echo "[INFO] Using POLY_CONF=$POLY_CONF"; \
+    ls -la "$POLY_CONF" || true; \
+    cp "${NUC_ROBOT_CONFIG_DIR}/franka_hardware.yaml" "$POLY_CONF/robot_client/franka_hardware.yaml"; \
+    cp "${NUC_ROBOT_CONFIG_DIR}/franka_panda.yaml"    "$POLY_CONF/robot_model/franka_panda.yaml"
 
 # start the server
 RUN chmod +x /app/.docker/laptop/entrypoint.sh

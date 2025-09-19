@@ -21,7 +21,7 @@ echo "$ascii"
 echo "Welcome to the DROID setup process."
 
 
-read -p "Is this your first time setting up the machine? (yes/no): " first_time
+read -p "Is this your first time setting up the machine? (yes/no): " is_first_time
 
 # path variables
 ROOT_DIR="$(git rev-parse --show-toplevel)"
@@ -29,7 +29,7 @@ DOCKER_COMPOSE_DIR="$ROOT_DIR/.docker/laptop"
 DOCKER_COMPOSE_FILE="$DOCKER_COMPOSE_DIR/docker-compose-laptop.yaml"
 
 
-if [ "$first_time" = "yes" ]; then
+if [ "$is_first_time" = "yes" ]; then
 	# ensure local files are up to date and git lfs is configured
 	echo -e "Ensure all submodules are cloned and oculus_reader APK file pulled locally \n"
 
@@ -78,9 +78,9 @@ if ! command -v adb >/dev/null 2>&1; then
   adb start-server || true
 fi
 
-read -p "Have you installed the oculus_reader APK file on your Oculus Quest 2? (yes/no): " first_time
+read -p "Have you installed the oculus_reader APK file on your Oculus Quest 2? (yes/no): " need_apk_install
 
-if [ "$first_time" = "no" ]; then
+if [ "$need_apk_install" = "no" ]; then
 
 	# install APK on Oculus device
 	echo -e "Install APK on oculus device \n"
@@ -157,9 +157,9 @@ xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f $DOCKER_XAUTH nmerge -
 
 # build client server container
 
-read -p "Do you want to rebuild the container image? (yes/no): " first_time
+read -p "Do you want to rebuild the container image? (yes/no): " need_rebuild
 
-if [ "$first_time" = "yes" ]; then
+if [ "$need_rebuild" = "yes" ]; then
 	echo -e "build control server container \n"
 	cd $DOCKER_COMPOSE_DIR && docker compose -f $DOCKER_COMPOSE_FILE build
 fi
@@ -195,8 +195,11 @@ echo "Static IP configuration complete for interface $interface_name."
 read -p "Please plug in and out each camera connected via usb and press enter once done?: " _
 
 echo "Starting ADB server on host machine"
-adb kill-server || true
-adb -a nodaemon server start &> /dev/null &
+if ! ss -lntp | grep -q ':5037 '; then
+  adb -a nodaemon server start &> /dev/null &
+  sleep 0.5
+fi
+adb devices || true
 
 # Retry loop
 max_retries=3
