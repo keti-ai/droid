@@ -21,4 +21,5 @@ dependencies:
   - zstd
   - libprotobuf
   - protobuf
+  - pinocchio
   # pip 패키지는 비워두거나 최소화 (아래 RUN pip ...에서 설치)

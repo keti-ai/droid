@@ -19,6 +19,11 @@ ENV ROBOT_IP=${ROBOT_IP}
 ENV NUC_IP=${NUC_IP}
 
 # -------- Base packages --------
+RUN apt-get purge -y cmake && \
+    wget https://cmake.org/files/v3.25/cmake-3.25.3-linux-aarch64.tar.gz && \
+    tar -zxvf cmake-3.25.3-linux-aarch64.tar.gz -C /usr/local --strip-components=1 && \
+    rm cmake-3.25.3-linux-aarch64.tar.gz
+
 RUN apt-get update && \
     apt-get install -y tzdata software-properties-common build-essential sudo \
     git curl wget python3-pip libspdlog-dev libeigen3-dev lsb-release ffmpeg \
@@ -85,7 +90,7 @@ RUN pip install --upgrade pip==23.3.2 && \
 
 # -------- Polymetis 파이썬 설치 --------
 # (setup.cfg/pyproject.toml에 맞춰 파이썬 파트만 설치)
-RUN pip install -e polymetis
+RUN pip install --no-deps -e polymetis
 
 # -------- libfranka & Polymetis C++ 빌드 --------
 #   - apt로 깔아둔 Poco/Eigen/spdlog/yaml-cpp/urdfdom 사용
