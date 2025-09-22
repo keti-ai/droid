@@ -42,7 +42,7 @@ RUN apt-get update && \
     libpoco-dev \
     openmpi-bin libopenmpi-dev \
     patchelf \
-    libgrpc-dev \
+    libgrpc-dev libgrpc++-dev  \
     protobuf-compiler-grpc \
     && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
@@ -90,11 +90,11 @@ RUN pip install \
     plotly dash pymodbus==2.5.3
 
 # -------- (중요) Jetson용 PyTorch 설치 --------
-RUN pip install --upgrade pip==23.3.2 && \
-    pip install --no-cache-dir \
-      https://developer.download.nvidia.com/compute/redist/jp/v50/pytorch/torch-1.12.0a0+2c916ef.nv22.3-cp38-cp38-linux_aarch64.whl \
-      torchvision==0.13.0 \
-      torchaudio==0.12.1
+#RUN pip install --upgrade pip==23.3.2 && \
+#    pip install --no-cache-dir \
+#      https://developer.download.nvidia.com/compute/redist/jp/v50/pytorch/torch-1.12.0a0+2c916ef.nv22.3-cp38-cp38-linux_aarch64.whl \
+#      torchvision==0.13.0 \
+#      torchaudio==0.12.1
 
 # -------- Polymetis 파이썬 설치 --------
 # (setup.cfg/pyproject.toml에 맞춰 파이썬 파트만 설치)
@@ -114,6 +114,9 @@ RUN rm -rf polymetis/torch_isolation
 # torch_isolation 완전 비활성화 (강한 패턴 + 검증)
 RUN sed -ri 's|^[[:space:]]*add_subdirectory[[:space:]]*\([[:space:]]*torch_isolation([^)]*)\)|# &|I' polymetis/CMakeLists.txt \
  && grep -n -i 'add_subdirectory.*torch_isolation' polymetis/CMakeLists.txt || true
+
+RUN sed -ri 's|^[[:space:]]*add_subdirectory[[:space:]]*\([[:space:]]*torch_isolation([^)]*)\)|# &|I' polymetis/polymetis/CMakeLists.txt || true
+RUN sed -ri 's|torch_isolation[^"]*||g' polymetis/polymetis/CMakeLists.txt || true
 
 # torch_isolation include 디렉토리 주석 처리
 RUN sed -ri 's|^[[:space:]]*"\$\{CMAKE_CURRENT_SOURCE_DIR\}/torch_isolation/include"|# &|g' polymetis/CMakeLists.txt \
@@ -144,7 +147,8 @@ RUN rm -rf polymetis/build && mkdir -p polymetis/build && cd polymetis/build && 
       -DCMAKE_DISABLE_FIND_PACKAGE_Torch=ON \
       -DCMAKE_DISABLE_FIND_PACKAGE_Caffe2=ON \
       -DCMAKE_DISABLE_FIND_PACKAGE_CUDNN=ON \
-      -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;/usr;/usr/local" \
+      -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;/usr;/usr/local;/usr/lib/aarch64-linux-gnu/cmake" \
+      -DgRPC_DIR=/usr/lib/aarch64-linux-gnu/cmake/grpc \
       -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda && \
     ninja
 
