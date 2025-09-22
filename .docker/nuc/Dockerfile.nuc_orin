@@ -91,6 +91,16 @@ RUN pip install \
     importlib-resources==5.7.1 \
     plotly dash pymodbus==2.5.3
 
+# ---- C++ gRPC & deps for CMake (inside conda env) ----
+RUN conda install -c conda-forge \
+    grpc-cpp=1.56.2 \
+    abseil-cpp \
+    c-ares \
+    re2 \
+    zlib \
+    openssl \
+    protobuf=3.20.3
+
 # -------- (중요) Jetson용 PyTorch 설치 --------
 RUN pip install --upgrade pip==23.3.2 && \
     pip install --no-cache-dir \
@@ -123,6 +133,9 @@ RUN sed -ri 's|^[[:space:]]*"\$\{CMAKE_CURRENT_SOURCE_DIR\}/torch_isolation/incl
 RUN sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-Wl,--no-as-needed[[:space:]]+torchscript_pinocchio\)|# &|I' polymetis/CMakeLists.txt \
  && sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-Wl,--no-as-needed[[:space:]]+torchrot\)|# &|I' polymetis/CMakeLists.txt \
  && sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-Wl,--no-as-needed[[:space:]]+torch_server_ops\)|# &|I' polymetis/CMakeLists.txt
+
+# 최후수단: torch_isolation 서브트리 자체를 무해화 (CMakeLists 스텁)
+RUN printf "cmake_minimum_required(VERSION 3.14)\nproject(torch_isolation_stub)\n" > polymetis/torch_isolation/CMakeLists.txt
 
 # CMake가 Torch/Caffe2/CUDNN 탐색 자체를 못 하게 글로벌 차단
 ENV CMAKE_DISABLE_FIND_PACKAGE_Torch=ON \
