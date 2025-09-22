@@ -15,6 +15,13 @@ ENV DEBIAN_FRONTEND=noninteractive TZ=Asia/Seoul
 ENV CUDA_HOME=/usr/local/cuda \
     CUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda \
     LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
+
+# CUDA 경로
+ENV PATH=/usr/local/cuda/bin:${PATH}
+ENV CUDA_HOME=/usr/local/cuda
+ENV CUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda
+ENV CXXFLAGS="-std=gnu++17"
+
 ENV ROBOT_TYPE=${ROBOT_TYPE}
 ENV LIBFRANKA_VERSION=${LIBFRANKA_VERSION}
 ENV ROBOT_IP=${ROBOT_IP}
@@ -98,16 +105,16 @@ RUN pip install --no-deps -e polymetis
 # -------- libfranka & Polymetis C++ 빌드 --------
 #   - apt로 깔아둔 Poco/Eigen/spdlog/yaml-cpp/urdfdom 사용
 
-# C++17 강제
-ENV CXXFLAGS="-std=gnu++17"
-
+# libfranka 먼저
 WORKDIR /app/droid/fairo/polymetis
 RUN CMAKE_PREFIX_PATH="/usr;/usr/local" \
     CXXFLAGS="-std=gnu++17" \
     ./scripts/build_libfranka.sh ${LIBFRANKA_VERSION}
 
-RUN sed -i 's|add_subdirectory(torch_isolation|# add_subdirectory(torch_isolation|g' polymetis/CMakeLists.txt
+# torch_isolation 완전 비활성화
+RUN sed -ri 's|^[[:space:]]*add_subdirectory[[:space:]]*\([[:space:]]*torch_isolation[[:space:]]*\)|# &|g' polymetis/CMakeLists.txt
 
+# Polymetis C++ 빌드 (Torch 힌트 제거)
 WORKDIR /app/droid/fairo/polymetis
 RUN mkdir -p polymetis/build && cd polymetis/build && \
     cmake .. -GNinja \
@@ -116,8 +123,10 @@ RUN mkdir -p polymetis/build && cd polymetis/build && \
       -DBUILD_FRANKA=ON \
       -DBUILD_TESTS=ON \
       -DBUILD_DOCS=ON \
-      -DTorch_DIR=$CONDA_PREFIX/lib/python3.8/site-packages/torch/share/cmake/Torch \
-      -DCMAKE_PREFIX_PATH="$CONDA_PREFIX" && \
+      -DBUILD_TORCH_ISOLATION=OFF \
+      -DPOLYMETIS_BUILD_TORCH_ISOLATION=OFF \
+      -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;/usr;/usr/local" \
+      -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda && \
     ninja
 
 # -------- 설정 파일 배치 --------
