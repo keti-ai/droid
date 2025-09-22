@@ -111,12 +111,27 @@ RUN CMAKE_PREFIX_PATH="/usr;/usr/local" \
     CXXFLAGS="-std=gnu++17" \
     ./scripts/build_libfranka.sh ${LIBFRANKA_VERSION}
 
-# torch_isolation 완전 비활성화
-RUN sed -ri 's|^[[:space:]]*add_subdirectory[[:space:]]*\([[:space:]]*torch_isolation[[:space:]]*\)|# &|g' polymetis/CMakeLists.txt
+# torch_isolation 완전 비활성화 (강한 패턴 + 검증)
+RUN sed -ri 's|^[[:space:]]*add_subdirectory[[:space:]]*\([[:space:]]*torch_isolation([^)]*)\)|# &|I' polymetis/CMakeLists.txt \
+ && grep -n -i 'add_subdirectory.*torch_isolation' polymetis/CMakeLists.txt || true
+
+# torch_isolation include 디렉토리 주석 처리
+RUN sed -ri 's|^[[:space:]]*"\$\{CMAKE_CURRENT_SOURCE_DIR\}/torch_isolation/include"|# &|g' polymetis/CMakeLists.txt \
+ && sed -ri 's|^[[:space:]]*"\$\{CMAKE_CURRENT_SOURCE_DIR\}/torch_isolation/pinocchio_isolation/include"|# &|g' polymetis/CMakeLists.txt
+
+# torch 관련 링크 라인 주석 처리
+RUN sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-Wl,--no-as-needed[[:space:]]+torchscript_pinocchio\)|# &|I' polymetis/CMakeLists.txt \
+ && sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-Wl,--no-as-needed[[:space:]]+torchrot\)|# &|I' polymetis/CMakeLists.txt \
+ && sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-Wl,--no-as-needed[[:space:]]+torch_server_ops\)|# &|I' polymetis/CMakeLists.txt
+
+# CMake가 Torch/Caffe2/CUDNN 탐색 자체를 못 하게 글로벌 차단
+ENV CMAKE_DISABLE_FIND_PACKAGE_Torch=ON \
+    CMAKE_DISABLE_FIND_PACKAGE_Caffe2=ON \
+    CMAKE_DISABLE_FIND_PACKAGE_CUDNN=ON
 
 # Polymetis C++ 빌드 (Torch 힌트 제거)
 WORKDIR /app/droid/fairo/polymetis
-RUN mkdir -p polymetis/build && cd polymetis/build && \
+RUN rm -rf polymetis/build && mkdir -p polymetis/build && cd polymetis/build && \
     cmake .. -GNinja \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_CXX_STANDARD=17 \
@@ -125,6 +140,9 @@ RUN mkdir -p polymetis/build && cd polymetis/build && \
       -DBUILD_DOCS=ON \
       -DBUILD_TORCH_ISOLATION=OFF \
       -DPOLYMETIS_BUILD_TORCH_ISOLATION=OFF \
+      -DCMAKE_DISABLE_FIND_PACKAGE_Torch=ON \
+      -DCMAKE_DISABLE_FIND_PACKAGE_Caffe2=ON \
+      -DCMAKE_DISABLE_FIND_PACKAGE_CUDNN=ON \
       -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;/usr;/usr/local" \
       -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda && \
     ninja
