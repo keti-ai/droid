@@ -6,14 +6,12 @@ channels:
 dependencies:
   - python=3.8.*       # ★ 반드시 3.8 고정 (cp38)
   - pip
-  - cmake
   - eigen=3.3
   - ninja
   - pkg-config
   - yaml-cpp
   - urdfdom
   - urdfdom_headers
-  - poco
   - assimp
   - openmpi
   - doxygen
