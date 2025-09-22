@@ -42,17 +42,15 @@ RUN apt-get update && \
     libpoco-dev \
     openmpi-bin libopenmpi-dev \
     patchelf \
+    libgrpc-dev \
+    protobuf-compiler-grpc \
     && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get purge -y cmake && \
     wget https://cmake.org/files/v3.25/cmake-3.25.3-linux-aarch64.tar.gz && \
     tar -zxvf cmake-3.25.3-linux-aarch64.tar.gz -C /usr/local --strip-components=1 && \
     rm cmake-3.25.3-linux-aarch64.tar.gz
-# -------- CMake 최신 --------
-#RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-#      gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null \
-# && apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' \
-# && apt-get update && apt-get install -y cmake
+
 
 # -------- 프로젝트 복사 --------
 COPY . /app
@@ -91,16 +89,6 @@ RUN pip install \
     importlib-resources==5.7.1 \
     plotly dash pymodbus==2.5.3
 
-# ---- C++ gRPC & deps for CMake (inside conda env) ----
-RUN conda install -c conda-forge \
-    grpc-cpp=1.56.2 \
-    abseil-cpp \
-    c-ares \
-    re2 \
-    zlib \
-    openssl \
-    protobuf=3.20.3
-
 # -------- (중요) Jetson용 PyTorch 설치 --------
 RUN pip install --upgrade pip==23.3.2 && \
     pip install --no-cache-dir \
@@ -121,6 +109,8 @@ RUN CMAKE_PREFIX_PATH="/usr;/usr/local" \
     CXXFLAGS="-std=gnu++17" \
     ./scripts/build_libfranka.sh ${LIBFRANKA_VERSION}
 
+RUN rm -rf polymetis/torch_isolation
+
 # torch_isolation 완전 비활성화 (강한 패턴 + 검증)
 RUN sed -ri 's|^[[:space:]]*add_subdirectory[[:space:]]*\([[:space:]]*torch_isolation([^)]*)\)|# &|I' polymetis/CMakeLists.txt \
  && grep -n -i 'add_subdirectory.*torch_isolation' polymetis/CMakeLists.txt || true
@@ -134,8 +124,6 @@ RUN sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-
  && sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-Wl,--no-as-needed[[:space:]]+torchrot\)|# &|I' polymetis/CMakeLists.txt \
  && sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-Wl,--no-as-needed[[:space:]]+torch_server_ops\)|# &|I' polymetis/CMakeLists.txt
 
-# 최후수단: torch_isolation 서브트리 자체를 무해화 (CMakeLists 스텁)
-RUN printf "cmake_minimum_required(VERSION 3.14)\nproject(torch_isolation_stub)\n" > polymetis/torch_isolation/CMakeLists.txt
 
 # CMake가 Torch/Caffe2/CUDNN 탐색 자체를 못 하게 글로벌 차단
 ENV CMAKE_DISABLE_FIND_PACKAGE_Torch=ON \
