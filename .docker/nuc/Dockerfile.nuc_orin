@@ -1,5 +1,5 @@
 # Jetson Orin (aarch64), no sim deps, Polymetis + Franka only
-FROM ubuntu:20.04
+FROM nvcr.io/nvidia/l4t-cuda:11.4.19-devel
 
 # -------- Build args --------
 ARG ROBOT_TYPE=${ROBOT_TYPE}
@@ -11,8 +11,10 @@ ARG NUC_ROBOT_CONFIG_DIR=/app/config/${ROBOT_TYPE}
 ARG NUC_POLYMETIS_CONFIG_DIR=${NUC_POLYMETIS_DIR}/polymetis/conf
 
 # -------- Runtime env --------
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Asia/Seoul
+ENV DEBIAN_FRONTEND=noninteractive TZ=Asia/Seoul
+ENV CUDA_HOME=/usr/local/cuda \
+    CUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda \
+    LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
 ENV ROBOT_TYPE=${ROBOT_TYPE}
 ENV LIBFRANKA_VERSION=${LIBFRANKA_VERSION}
 ENV ROBOT_IP=${ROBOT_IP}
@@ -95,9 +97,27 @@ RUN pip install --no-deps -e polymetis
 
 # -------- libfranka & Polymetis C++ 빌드 --------
 #   - apt로 깔아둔 Poco/Eigen/spdlog/yaml-cpp/urdfdom 사용
-RUN ./scripts/build_libfranka.sh ${LIBFRANKA_VERSION} && \
-    mkdir -p ./polymetis/build && cd ./polymetis/build && \
-    cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_FRANKA=ON -DBUILD_TESTS=ON -DBUILD_DOCS=ON && \
+
+# C++17 강제
+ENV CXXFLAGS="-std=gnu++17"
+
+WORKDIR /app/droid/fairo/polymetis
+RUN CMAKE_PREFIX_PATH="/usr;/usr/local" \
+    CXXFLAGS="-std=gnu++17" \
+    ./scripts/build_libfranka.sh ${LIBFRANKA_VERSION}
+
+RUN sed -i 's|add_subdirectory(torch_isolation|# add_subdirectory(torch_isolation|g' polymetis/CMakeLists.txt
+
+WORKDIR /app/droid/fairo/polymetis
+RUN mkdir -p polymetis/build && cd polymetis/build && \
+    cmake .. -GNinja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_CXX_STANDARD=17 \
+      -DBUILD_FRANKA=ON \
+      -DBUILD_TESTS=ON \
+      -DBUILD_DOCS=ON \
+      -DTorch_DIR=$CONDA_PREFIX/lib/python3.8/site-packages/torch/share/cmake/Torch \
+      -DCMAKE_PREFIX_PATH="$CONDA_PREFIX" && \
     ninja
 
 # -------- 설정 파일 배치 --------
