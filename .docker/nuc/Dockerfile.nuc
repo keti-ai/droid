@@ -139,19 +139,17 @@ RUN ./scripts/build_libfranka.sh 0.15.2 && \
       -DBUILD_DOCS=OFF \
       -DFranka_DIR=/usr/local/lib/cmake/Franka \
       -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;/usr/local" \
-      -DProtobuf_DIR="$CONDA_PREFIX/lib/cmake/protobuf" \
       -DProtobuf_INCLUDE_DIR="$CONDA_PREFIX/include" \
       -DProtobuf_PROTOC_EXECUTABLE="$CONDA_PREFIX/bin/protoc" \
       -DProtobuf_USE_STATIC_LIBS=OFF \
-      -DgRPC_DIR="$CONDA_PREFIX/lib/cmake/grpc" \
-      -Dabsl_DIR="$CONDA_PREFIX/lib/cmake/absl" \
-      -DRE2_DIR="$CONDA_PREFIX/lib/cmake/re2" \
-      -DProtobuf_LIBRARIES="$CONDA_PREFIX/lib/libprotobuf.so" \
-      -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" \
-      -DCMAKE_CXX_FLAGS="$CXXFLAGS -D_GLIBCXX_USE_CXX11_ABI=1" \
-      -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS -Wl,--no-as-needed -lprotobuf -lgrpc++ -labsl_strings -labsl_synchronization -lre2 -Wl,--as-needed" \
-      -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS -Wl,--no-as-needed -lprotobuf -lgrpc++ -labsl_strings -labsl_synchronization -lre2 -Wl,--as-needed" && \
-    make -j$(nproc) && make install && ldconfig
+      -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" && \
+    \
+    # 1) 필요한 라이브러리 타깃만 빌드
+    cmake --build . --target generated_grpc_protos torch_server_ops torchrot pinocchio_wrapper -j"$(nproc)" && \
+    \
+    # 2) 설치 (install 규칙이 있는 것만 설치되므로 클라이언트는 건드리지 않음)
+    cmake --install . && \
+    ldconfig
 
 
 # set polymetis config files
