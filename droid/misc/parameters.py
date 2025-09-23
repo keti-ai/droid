@@ -10,16 +10,16 @@ robot_type = "fr3"  # 'panda' or 'fr3'
 robot_serial_number = "309969-2543204"
 
 # Camera ID's #
-hand_camera_id = ""
-varied_camera_1_id = ""
-varied_camera_2_id = ""
+hand_camera_id = "19133851"
+varied_camera_1_id = "33763137"
+varied_camera_2_id = "31194385"
 
 # Charuco Board Params #
 CHARUCOBOARD_ROWCOUNT = 9
 CHARUCOBOARD_COLCOUNT = 14
 CHARUCOBOARD_CHECKER_SIZE = 0.020
 CHARUCOBOARD_MARKER_SIZE = 0.016
-ARUCO_DICT = aruco.Dictionary_get(aruco.DICT_5X5_100)
+ARUCO_DICT = aruco.getPredefinedDictionary(aruco.DICT_5X5_100)
 
 # Ubuntu Pro Token (RT PATCH) #
 ubuntu_pro_token = "C12pmNBec2orFaRdXrS14sowyjUVp5"
