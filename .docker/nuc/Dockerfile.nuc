@@ -4,7 +4,7 @@ FROM ubuntu:bionic
 # build args
 ARG ROBOT_TYPE=${ROBOT_TYPE}
 ARG LIBFRANKA_VERSION=${LIBFRANKA_VERSION}
-ARG ROBOT_IP=${ROBOT_IP} 
+ARG ROBOT_IP=${ROBOT_IP}
 ARG NUC_IP=${NUC_IP}
 ARG NUC_POLYMETIS_DIR=/app/droid/fairo/polymetis
 ARG NUC_ROBOT_CONFIG_DIR=/app/config/${ROBOT_TYPE}
@@ -13,13 +13,14 @@ ARG NUC_POLYMETIS_CONFIG_DIR=${NUC_POLYMETIS_DIR}/polymetis/conf
 # runtime env vars
 ENV ROBOT_TYPE=${ROBOT_TYPE}
 ENV LIBFRANKA_VERSION=${LIBFRANKA_VERSION}
-ENV ROBOT_IP=${ROBOT_IP} 
+ENV ROBOT_IP=${ROBOT_IP}
 ENV NUC_IP=${NUC_IP}
 
-# base system installations
+# --- 여기부터 기존 base 설치 블록에 ca-certificates 추가 ---
 RUN apt-get update && \
     apt-get install -y software-properties-common build-essential sudo git curl wget python3-pip libspdlog-dev \
-    libeigen3-dev lsb-release ffmpeg libsm6 libxext6 && \
+    libeigen3-dev lsb-release ffmpeg libsm6 libxext6 ca-certificates && \
+    update-ca-certificates && \
     apt-get upgrade -y
 
 # install latest cmake version
@@ -32,36 +33,103 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
 COPY . /app
 WORKDIR /app
 
-# install miniconda 
-RUN wget \
-    https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+# install miniconda
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
     && mkdir /root/.conda \
     && bash Miniconda3-latest-Linux-x86_64.sh -b \
     && rm -f Miniconda3-latest-Linux-x86_64.sh
 ENV PATH /root/miniconda3/bin:$PATH
 
-# setup polymetis conda env
+# setup polymetis conda env (mamba 사용 + 재시도)
 WORKDIR ${NUC_POLYMETIS_DIR}
-# --- add: accept Anaconda TOS for 'defaults' channels used by environment.yml ---
+# --- accept Anaconda TOS for 'defaults' channels used by environment.yml ---
+# --- accept Anaconda TOS for 'defaults' channels used by environment.yml ---
 RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
     conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
-    conda env create -f ./polymetis/environment.yml && \
-    conda run -n polymetis-local pip install -e ./polymetis
+    conda config --remove-key channels || true && \
+    conda config --add channels conda-forge && \
+    conda config --add channels defaults && \
+    conda config --set channel_priority flexible
+
+# micromamba 설치 (파이썬 무의존, base py 3.13과 충돌 없음)
+ENV MAMBA_ROOT_PREFIX=/root/miniconda3
+RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba && \
+    mv bin/micromamba /usr/local/bin/ && rm -rf bin
+
+# polymetis env 생성 및 설치 (micromamba 사용)
+WORKDIR ${NUC_POLYMETIS_DIR}
+RUN bash -lc 'for i in 1 2 3; do \
+      micromamba create -y -n polymetis-local -f ./polymetis/environment.yml && break || (echo "[micromamba retry $i]" && sleep 10); \
+    done' && \
+    micromamba run -n polymetis-local pip install -e ./polymetis
+
+
+RUN conda config --remove-key channels || true && \
+    conda config --add channels conda-forge && \
+    conda config --add channels defaults
+
+
+
+# 이후 RUN 들은 전부 conda env 안에서 실행
+# --- (중요) 최신 툴체인/런타임으로 링크 에러 제거 ---
+# mamba는 base에 깔려 있으니 base에서 대상 env(-n polymetis-local)로 설치
+RUN CONDA_NO_PLUGINS=true /root/miniconda3/bin/mamba install -y -n polymetis-local -c conda-forge \
+      "gcc_linux-64=11.*" "gxx_linux-64=11.*" "libstdcxx-ng>=12.2" \
+      "spdlog>=1.10" \
+      "libprotobuf=3.20.*" "protobuf=3.20.*" "grpc-cpp<1.60" \
+      "abseil-cpp>=202301" "re2" \
+      "pkg-config"
+
+# 이후 RUN 들은 전부 conda env 안에서 실행 (여기서 전환)
 SHELL ["conda", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
 
-# build libfranka and polymetis
-RUN ./scripts/build_libfranka.sh 0.13.3 && \
+# conda 툴체인을 기본 컴파일러로 고정
+ENV CONDA_PREFIX=/root/miniconda3/envs/polymetis-local
+ENV CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
+ENV CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
+ENV LD_LIBRARY_PATH=$CONDA_PREFIX/lib:/usr/local/lib:$LD_LIBRARY_PATH
+ENV CPATH=$CONDA_PREFIX/include:$CPATH
+ENV LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
+ENV PKG_CONFIG_PATH=$CONDA_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH
+ENV CXXFLAGS="$CXXFLAGS -I$CONDA_PREFIX/include -include cstddef"
+ENV LDFLAGS="$LDFLAGS -L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib"
+
+# build libfranka(0.15.2) and polymetis
+# - build_libfranka.sh 가 /usr/local 로 설치하도록 되어 있다고 가정
+# build libfranka(0.15.2) and polymetis
+RUN ./scripts/build_libfranka.sh 0.15.2 && \
+    cmake --build ./polymetis/src/clients/franka_panda_client/third_party/libfranka/build --target install && \
+    ldconfig && \
     mkdir -p ./polymetis/build && \
     cd ./polymetis/build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_FRANKA=ON -DBUILD_TESTS=ON -DBUILD_DOCS=ON && \
-    make -j
+    cmake .. \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_CXX_STANDARD=17 \
+      -DBUILD_FRANKA=ON \
+      -DBUILD_TESTS=OFF \
+      -DBUILD_DOCS=OFF \
+      -DFranka_DIR=/usr/local/lib/cmake/Franka \
+      -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;/usr/local" \
+      -DProtobuf_DIR="$CONDA_PREFIX/lib/cmake/protobuf" \
+      -DProtobuf_INCLUDE_DIR="$CONDA_PREFIX/include" \
+      -DProtobuf_PROTOC_EXECUTABLE="$CONDA_PREFIX/bin/protoc" \
+      -DProtobuf_USE_STATIC_LIBS=OFF \
+      -DgRPC_DIR="$CONDA_PREFIX/lib/cmake/grpc" \
+      -Dabsl_DIR="$CONDA_PREFIX/lib/cmake/absl" \
+      -DRE2_DIR="$CONDA_PREFIX/lib/cmake/re2" \
+      -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" \
+      -DCMAKE_CXX_FLAGS="$CXXFLAGS -D_GLIBCXX_USE_CXX11_ABI=1" \
+      -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS -lprotobuf -lgrpc++ -labsl_strings -labsl_synchronization -lre2" \
+      -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS -lprotobuf -lgrpc++ -labsl_strings -absl_synchronization -lre2" && \
+    make -j$(nproc) && make install && ldconfig
+
 
 # set polymetis config files
 WORKDIR /app
 RUN cp ${NUC_ROBOT_CONFIG_DIR}/franka_hardware.yaml ${NUC_POLYMETIS_CONFIG_DIR}/robot_client/franka_hardware.yaml && \
     cp ${NUC_ROBOT_CONFIG_DIR}/franka_panda.yaml ${NUC_POLYMETIS_CONFIG_DIR}/robot_model/franka_panda.yaml
 
-# python environment setup 
+# python environment setup
 RUN pip3 install -e . && \
     pip3 install dm-robotics-moma==0.5.0 --no-deps && \
     pip3 install dm-robotics-transformations==0.5.0 --no-deps && \
