@@ -70,18 +70,12 @@ RUN conda config --remove-key channels || true && \
 
 
 
-# 이후 RUN 들은 전부 conda env 안에서 실행
-# --- (중요) 최신 툴체인/런타임으로 링크 에러 제거 ---
-# mamba는 base에 깔려 있으니 base에서 대상 env(-n polymetis-local)로 설치
-RUN CONDA_NO_PLUGINS=true /root/miniconda3/bin/mamba install -y -n polymetis-local -c conda-forge \
-      "gcc_linux-64=11.*" "gxx_linux-64=11.*" "libstdcxx-ng>=12.2" \
-      "spdlog>=1.10" \
-      "libprotobuf=3.20.*" "protobuf=3.20.*" "grpc-cpp<1.60" \
-      "abseil-cpp>=202301" "re2" \
-      "pkg-config"
+RUN micromamba install -y -n polymetis-local -c conda-forge \
+  "protobuf=3.20.*" "libprotobuf=3.20.*" "grpc-cpp<1.60" "abseil-cpp>=202301" "re2" "spdlog>=1.10" \
+  "gcc_linux-64=11.*" "gxx_linux-64=11.*" "libstdcxx-ng>=12.2" "pkg-config"
 
 # 이후 RUN 들은 전부 conda env 안에서 실행 (여기서 전환)
-SHELL ["conda", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
+SHELL ["micromamba", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
 
 # conda 툴체인을 기본 컴파일러로 고정
 ENV CONDA_PREFIX=/root/miniconda3/envs/polymetis-local
@@ -94,8 +88,43 @@ ENV PKG_CONFIG_PATH=$CONDA_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH
 ENV CXXFLAGS="$CXXFLAGS -I$CONDA_PREFIX/include -include cstddef"
 ENV LDFLAGS="$LDFLAGS -L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib"
 
-# build libfranka(0.15.2) and polymetis
-# - build_libfranka.sh 가 /usr/local 로 설치하도록 되어 있다고 가정
+# --- torch_server_ops.hpp/.cpp 패치: size_t 통일 + <cstddef> 주입 (경로 자동 탐색)
+RUN set -euo pipefail; \
+    HPP_PATH="$(find polymetis -path '*/torch_isolation/include/torch_server_ops.hpp' | head -n1)"; \
+    CPP_PATH="$(find polymetis -path '*/torch_isolation/src/torch_server_ops.cpp'   | head -n1)"; \
+    echo "[patch] HPP=${HPP_PATH}"; echo "[patch] CPP=${CPP_PATH}"; \
+    test -n "${HPP_PATH}" && test -n "${CPP_PATH}"; \
+    sed -i '1i #include <cstddef>' "${HPP_PATH}"; \
+    sed -i 's/(char *data, *int /(char *data, size_t /g' "${HPP_PATH}"; \
+    sed -i '1i #include <cstddef>' "${CPP_PATH}"; \
+    sed -i 's/(char \*data, *int /(char *data, size_t /g' "${CPP_PATH}"
+
+
+# 클라이언트 실행파일 타깃들에 protobuf/grpc/absl/re2 링크 의존성 주입
+RUN bash -euo pipefail <<'PATCH'
+for T in franka_panda_client franka_hand_client empty_statistics_client; do
+  # 해당 타깃을 add_executable() 하는 CMakeLists 찾기
+  F=$(grep -RIl --include=CMakeLists.txt -e "add_executable[[:space:]]*(${T}\b" polymetis || true)
+  if [ -n "$F" ]; then
+    echo "[patch] $T in $F"
+    # 이미 link가 있으면 중복 삽입 방지
+    if ! grep -q "target_link_libraries(${T} " "$F"; then
+      # add_executable(...) 바로 다음 줄에 target_link_libraries(...) 삽입
+      awk -v tgt="$T" '
+        $0 ~ "add_executable[[:space:]]*\\(" tgt "\\b" && !done {
+          print
+          print "target_link_libraries(" tgt " PRIVATE protobuf::libprotobuf gRPC::grpc++ absl::strings re2)"
+          done=1
+          next
+        }
+        { print }
+      ' "$F" > "$F.new" && mv "$F.new" "$F"
+    fi
+  fi
+done
+PATCH
+
+
 # build libfranka(0.15.2) and polymetis
 RUN ./scripts/build_libfranka.sh 0.15.2 && \
     cmake --build ./polymetis/src/clients/franka_panda_client/third_party/libfranka/build --target install && \
@@ -117,10 +146,11 @@ RUN ./scripts/build_libfranka.sh 0.15.2 && \
       -DgRPC_DIR="$CONDA_PREFIX/lib/cmake/grpc" \
       -Dabsl_DIR="$CONDA_PREFIX/lib/cmake/absl" \
       -DRE2_DIR="$CONDA_PREFIX/lib/cmake/re2" \
+      -DProtobuf_LIBRARIES="$CONDA_PREFIX/lib/libprotobuf.so" \
       -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" \
       -DCMAKE_CXX_FLAGS="$CXXFLAGS -D_GLIBCXX_USE_CXX11_ABI=1" \
-      -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS -lprotobuf -lgrpc++ -labsl_strings -labsl_synchronization -lre2" \
-      -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS -lprotobuf -lgrpc++ -labsl_strings -absl_synchronization -lre2" && \
+      -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS -Wl,--no-as-needed -lprotobuf -lgrpc++ -labsl_strings -labsl_synchronization -lre2 -Wl,--as-needed" \
+      -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS -Wl,--no-as-needed -lprotobuf -lgrpc++ -labsl_strings -labsl_synchronization -lre2 -Wl,--as-needed" && \
     make -j$(nproc) && make install && ldconfig
 
 
