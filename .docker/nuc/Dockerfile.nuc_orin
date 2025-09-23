@@ -42,8 +42,6 @@ RUN apt-get update && \
     libpoco-dev \
     openmpi-bin libopenmpi-dev \
     patchelf \
-    libgrpc-dev libgrpc++-dev  \
-    protobuf-compiler-grpc \
     && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get purge -y cmake && \
@@ -78,11 +76,18 @@ RUN conda config --set always_yes yes \
 
 # conda run 기본 쉘
 SHELL ["conda", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
+RUN conda install -c conda-forge -y \
+    grpcio=1.56.2 grpc-cpp=1.56.2 \
+    protobuf=3.20.3 protoc
+
+RUN pip install grpcio-tools==1.56.2
 
 RUN pip install --upgrade pip==23.3.2
 
+RUN pip install --upgrade pip==23.3.2 \
 RUN pip install \
     grpcio==1.56.2 \
+    grpcio-tools==1.56.2 \
     pybullet==3.2.6 \
     mujoco==3.1.6 \
     hydra-core==1.0.6 \
@@ -111,46 +116,98 @@ RUN CMAKE_PREFIX_PATH="/usr;/usr/local" \
 
 RUN rm -rf polymetis/torch_isolation
 
-# torch_isolation 완전 비활성화 (강한 패턴 + 검증)
-RUN sed -ri 's|^[[:space:]]*add_subdirectory[[:space:]]*\([[:space:]]*torch_isolation([^)]*)\)|# &|I' polymetis/CMakeLists.txt \
- && grep -n -i 'add_subdirectory.*torch_isolation' polymetis/CMakeLists.txt || true
+RUN find polymetis -name CMakeLists.txt -exec \
+    sed -ri 's|^[[:space:]]*add_subdirectory[[:space:]]*\([^)]*torch_isolation[^)]*\)|# &|I' {} +
+RUN find polymetis -name CMakeLists.txt -exec \
+    sed -ri 's|torch_isolation[^") ]*||g' {} +
+RUN ! grep -Rni --include=CMakeLists.txt "add_subdirectory.*torch_isolation" polymetis || \
+    (echo "STILL_REFERENCED_TORCH_ISOLATION"; exit 1)
 
-RUN sed -ri 's|^[[:space:]]*add_subdirectory[[:space:]]*\([[:space:]]*torch_isolation([^)]*)\)|# &|I' polymetis/polymetis/CMakeLists.txt || true
-RUN sed -ri 's|torch_isolation[^"]*||g' polymetis/polymetis/CMakeLists.txt || true
-
-# torch_isolation include 디렉토리 주석 처리
-RUN sed -ri 's|^[[:space:]]*"\$\{CMAKE_CURRENT_SOURCE_DIR\}/torch_isolation/include"|# &|g' polymetis/CMakeLists.txt \
- && sed -ri 's|^[[:space:]]*"\$\{CMAKE_CURRENT_SOURCE_DIR\}/torch_isolation/pinocchio_isolation/include"|# &|g' polymetis/CMakeLists.txt
-
-# torch 관련 링크 라인 주석 처리
-RUN sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-Wl,--no-as-needed[[:space:]]+torchscript_pinocchio\)|# &|I' polymetis/CMakeLists.txt \
- && sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-Wl,--no-as-needed[[:space:]]+torchrot\)|# &|I' polymetis/CMakeLists.txt \
- && sed -ri 's|^[[:space:]]*target_link_libraries\(polymetis_server[[:space:]]+-Wl,--no-as-needed[[:space:]]+torch_server_ops\)|# &|I' polymetis/CMakeLists.txt
-
-
-# CMake가 Torch/Caffe2/CUDNN 탐색 자체를 못 하게 글로벌 차단
-ENV CMAKE_DISABLE_FIND_PACKAGE_Torch=ON \
-    CMAKE_DISABLE_FIND_PACKAGE_Caffe2=ON \
-    CMAKE_DISABLE_FIND_PACKAGE_CUDNN=ON
-
-# Polymetis C++ 빌드 (Torch 힌트 제거)
+# --- gRPC pkg-config fallback 모듈 추가 ---
+# gRPC pkg-config fallback 모듈 생성 (이미 존재할 필요 없음)
 WORKDIR /app/droid/fairo/polymetis
-RUN rm -rf polymetis/build && mkdir -p polymetis/build && cd polymetis/build && \
-    cmake .. -GNinja \
+RUN mkdir -p cmake && cat > cmake/FindgRPC.cmake <<'EOF'
+find_package(PkgConfig REQUIRED)
+
+# pkg-config로 기본 정보
+pkg_check_modules(GRPC REQUIRED grpc++ grpc)
+
+# grpcpp 헤더 실제 경로를 재탐색해 include 경로 교정
+find_path(GRPC_INCLUDE_DIR
+  NAMES grpcpp/grpcpp.h
+  HINTS ${GRPC_INCLUDE_DIRS}
+        /usr/include
+        /usr/local/include
+)
+if(NOT GRPC_INCLUDE_DIR)
+  message(FATAL_ERROR "Could not find grpc headers (grpcpp/grpcpp.h)")
+endif()
+
+# reflection 라이브러리(있으면 사용)
+find_library(GRPCPP_REFLECTION_LIB
+  NAMES grpc++_reflection
+  HINTS ${GRPC_LIBRARY_DIRS}
+        /usr/lib/aarch64-linux-gnu
+        /usr/local/lib
+)
+
+# gRPC::grpc++
+add_library(gRPC::grpc++ INTERFACE IMPORTED)
+set_target_properties(gRPC::grpc++ PROPERTIES
+  INTERFACE_INCLUDE_DIRECTORIES "${GRPC_INCLUDE_DIR}"
+  INTERFACE_LINK_LIBRARIES "${GRPC_LIBRARIES}"
+)
+
+# gRPC::grpc++_reflection (있을 때만)
+if(GRPCPP_REFLECTION_LIB)
+  add_library(gRPC::grpc++_reflection INTERFACE IMPORTED)
+  set_target_properties(gRPC::grpc++_reflection PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${GRPC_INCLUDE_DIR}"
+    INTERFACE_LINK_LIBRARIES "gRPC::grpc++;${GRPCPP_REFLECTION_LIB}"
+  )
+endif()
+# ---- plugin executables ----
+find_program(GRPC_CPP_PLUGIN_EXECUTABLE
+  NAMES grpc_cpp_plugin
+  HINTS /usr/bin /usr/local/bin
+)
+find_program(GRPC_PYTHON_PLUGIN_EXECUTABLE
+  NAMES grpc_python_plugin
+  HINTS /usr/bin /usr/local/bin $ENV{CONDA_PREFIX}/bin
+)
+if(GRPC_CPP_PLUGIN_EXECUTABLE)
+  set(_GRPC_CPP_PLUGIN_EXECUTABLE "${GRPC_CPP_PLUGIN_EXECUTABLE}" CACHE FILEPATH "")
+endif()
+if(GRPC_PYTHON_PLUGIN_EXECUTABLE)
+  set(_GRPC_PYTHON_PLUGIN_EXECUTABLE "${GRPC_PYTHON_PLUGIN_EXECUTABLE}" CACHE FILEPATH "")
+endif()
+
+EOF
+
+ENV Protobuf_PROTOC_EXECUTABLE=/usr/bin/protoc
+
+# --- CMake 호출 ---
+RUN rm -rf build && mkdir -p build && cd build && \
+    PKG_CONFIG_PATH= \
+    PKG_CONFIG_DIR= \
+    PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig \
+    cmake ../polymetis -GNinja \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_CXX_STANDARD=17 \
-      -DBUILD_FRANKA=ON \
-      -DBUILD_TESTS=ON \
-      -DBUILD_DOCS=ON \
-      -DBUILD_TORCH_ISOLATION=OFF \
-      -DPOLYMETIS_BUILD_TORCH_ISOLATION=OFF \
+      -DBUILD_FRANKA=ON -DBUILD_TESTS=ON -DBUILD_DOCS=ON \
+      -DBUILD_TORCH_ISOLATION=OFF -DPOLYMETIS_BUILD_TORCH_ISOLATION=OFF \
       -DCMAKE_DISABLE_FIND_PACKAGE_Torch=ON \
       -DCMAKE_DISABLE_FIND_PACKAGE_Caffe2=ON \
       -DCMAKE_DISABLE_FIND_PACKAGE_CUDNN=ON \
       -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;/usr;/usr/local;/usr/lib/aarch64-linux-gnu/cmake" \
+      -DCMAKE_MODULE_PATH=/app/droid/fairo/polymetis/cmake \
       -DgRPC_DIR=/usr/lib/aarch64-linux-gnu/cmake/grpc \
+      -D_GPRC_FIND_STRICT=ON \
+      -D_GPRC_CPP_PLUGIN_HINT=/usr/bin/grpc_cpp_plugin \
+      -D_GPRC_PY_PLUGIN_HINT=$CONDA_PREFIX/bin/grpc_python_plugin \
+      -DProtobuf_PROTOC_EXECUTABLE=/usr/bin/protoc \
       -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda && \
-    ninja
+    ninja -j"$(nproc)"
 
 # -------- 설정 파일 배치 --------
 WORKDIR /app
