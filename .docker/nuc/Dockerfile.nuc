@@ -50,7 +50,7 @@ RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkg
 SHELL ["conda", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
 
 # build libfranka and polymetis
-RUN ./scripts/build_libfranka.sh ${LIBFRANKA_VERSION} && \
+RUN ./scripts/build_libfranka.sh 0.13.3 && \
     mkdir -p ./polymetis/build && \
     cd ./polymetis/build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_FRANKA=ON -DBUILD_TESTS=ON -DBUILD_DOCS=ON && \
