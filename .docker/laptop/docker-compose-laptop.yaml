@@ -1,5 +1,4 @@
-version: "3.8"
-
+# version: "3"  # ← 이 줄은 삭제 (V2에서 불필요 경고)
 services:
   laptop_setup:
     # image: ghcr.io/droid-dataset/droid_laptop:${ROBOT_TYPE}
@@ -37,4 +36,5 @@ services:
     privileged: true
     network_mode: "host"
     gpus: all
-    command: python /app/scripts/main.py
+    command: >
+      bash -lc 'conda run -n robot python /app/scripts/main.py'
