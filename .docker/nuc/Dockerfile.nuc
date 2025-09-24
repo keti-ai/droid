@@ -85,6 +85,15 @@ ENV CONDA_PREFIX=/root/miniconda3/envs/polymetis-local
 ENV CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
 ENV CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
 
+# protobuf 설치 검증 및 cmake 파일 확인
+RUN echo "Checking protobuf libraries:" && \
+    ls -la $CONDA_PREFIX/lib/libprotobuf.* && \
+    nm -D $CONDA_PREFIX/lib/libprotobuf.so | grep -i "InternalMetadata" || echo "Warning: InternalMetadata symbol not found" && \
+    $CONDA_PREFIX/bin/protoc --version && \
+    echo "Checking protobuf cmake files:" && \
+    find $CONDA_PREFIX -name "*protobuf*.cmake" -type f && \
+    ls -la $CONDA_PREFIX/lib/cmake/protobuf/ || echo "protobuf cmake directory not found"
+
 # 🔧 여기서 TORCH_LIB/LD_LIBRARY_PATH 설정
 ENV TORCH_LIB=$CONDA_PREFIX/lib/python3.8/site-packages/torch/lib
 ENV LD_LIBRARY_PATH=$TORCH_LIB:$CONDA_PREFIX/lib:/usr/local/lib:$LD_LIBRARY_PATH
@@ -131,9 +140,12 @@ for T in franka_panda_client franka_hand_client empty_statistics_client; do
 done
 PATCH
 
-RUN sed -i '/target_link_libraries(run_server/ c\
-target_link_libraries(run_server polymetis_server protobuf::libprotobuf gRPC::grpc++ absl::strings re2 generated_grpc_protos pthread)' \
-  /app/droid/fairo/polymetis/polymetis/CMakeLists.txt
+## CMakeLists 직접 수정으로 대체했으므로 sed 기반 수정 제거
+
+# generated_grpc_protos 라이브러리를 정적 라이브러리에서 객체 라이브러리로 변경
+# removed: keep generated_grpc_protos as STATIC (no sed applied)
+# RUN sed -i 's/add_library(generated_grpc_protos STATIC/add_library(generated_grpc_protos OBJECT/' \
+#   /app/droid/fairo/polymetis/polymetis/CMakeLists.txt
 
 # protobuf 링킹 문제 해결을 위한 추가 설정
 RUN echo "export LD_LIBRARY_PATH=\$CONDA_PREFIX/lib:\$LD_LIBRARY_PATH" >> /root/.bashrc && \
@@ -151,8 +163,10 @@ RUN rm -rf ./polymetis/build && mkdir -p ./polymetis/build && cd ./polymetis/bui
       -DBUILD_FRANKA=ON \
       -DBUILD_TORCH_ISOLATION=ON \
       -DBUILD_TESTS=OFF -DBUILD_DOCS=OFF \
+      -DCMAKE_VERBOSE_MAKEFILE=ON \
       -DFranka_DIR=/usr/local/lib/cmake/Franka \
       -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;/usr/local" \
+      -Dprotobuf_DIR=$CONDA_PREFIX/lib/cmake/protobuf \
       -DProtobuf_INCLUDE_DIR="$CONDA_PREFIX/include" \
       -DProtobuf_PROTOC_EXECUTABLE="$CONDA_PREFIX/bin/protoc" \
       -DProtobuf_USE_STATIC_LIBS=OFF \
@@ -165,8 +179,17 @@ RUN rm -rf ./polymetis/build && mkdir -p ./polymetis/build && cd ./polymetis/bui
     cmake --install . && ldconfig && \
     \
     # run_server 빌드 (링크 에러 해결된 상태여야 함)
-    # protobuf 링킹 문제 해결을 위해 LDFLAGS 추가
-    LDFLAGS="-L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib" cmake --build . --target run_server -j"$(nproc)" && \
+    # protobuf 링킹 문제 해결을 위해 환경변수와 링커 플래그 설정
+    export LDFLAGS="$LDFLAGS -Wl,--no-as-needed" && \
+    # 디버깅: CMakeLists.txt 내용 확인
+    echo "=== CMakeLists.txt run_server 링킹 부분 ===" && \
+    grep -A 5 -B 5 "target_link_libraries(run_server" /app/droid/fairo/polymetis/polymetis/CMakeLists.txt && \
+    echo "=== generated_grpc_protos 링킹 부분 ===" && \
+    grep -A 5 -B 5 "target_link_libraries(generated_grpc_protos" /app/droid/fairo/polymetis/polymetis/CMakeLists.txt && \
+    echo "=== protobuf 라이브러리 심볼 확인 ===" && \
+    nm -D $CONDA_PREFIX/lib/libprotobuf.so | grep -i "InternalMetadata" | head -5 && \
+    echo "=== 표준 CMake 빌드 사용 (링커에 --no-as-needed 1회 추가) ===" && \
+    cmake --build . --target run_server -j"$(nproc)" && \
     install -m 755 ./run_server "$CONDA_PREFIX/bin/run_server" && \
     ldconfig
 

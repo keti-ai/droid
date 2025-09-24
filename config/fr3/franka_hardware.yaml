@@ -90,3 +90,8 @@ robot_client:
         cartesian_pos: 200.0
         joint_pos: 50.0
         joint_vel: 20.0
+
+server:
+  binary_path: "/root/miniconda3/envs/polymetis-local/bin/run_server"
+  ip_address: "0.0.0.0"
+  port: 50051
