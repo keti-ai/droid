@@ -82,8 +82,9 @@ SHELL ["micromamba", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
 
 # conda 툴체인을 기본 컴파일러로 고정
 ENV CONDA_PREFIX=/root/miniconda3/envs/polymetis-local
-# Disable conda binutils activation script to prevent unbound variable errors
-RUN find /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/ -name "*binutils*" -exec rm -f {} \; || true
+# Disable conda activation scripts to prevent unbound variable errors
+RUN find /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/ -name "*binutils*" -exec rm -f {} \; || true && \
+    find /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/ -name "*gcc*" -exec rm -f {} \; || true
 ENV CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
 ENV CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
 
