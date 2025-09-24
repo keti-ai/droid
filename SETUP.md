@@ -33,9 +33,16 @@ export DROID_LAPTOP_IP=172.16.0.1       # Default: 172.16.0.1
    source .env
    ```
 
-2. **Run the setup script:**
+2. **Run the setup script (securely pass env vars to sudo):**
+   - Option A) Preserve current shell env in sudo
    ```bash
-   sudo ./scripts/setup/nuc_setup.sh
+   sudo -E ./scripts/setup/nuc_setup.sh
+   ```
+   - Option B) Pass only required vars explicitly (recommended for CI/staging)
+   ```bash
+   sudo DROID_SUDO_PASSWORD="$DROID_SUDO_PASSWORD" \
+        DROID_UBUNTU_PRO_TOKEN="$DROID_UBUNTU_PRO_TOKEN" \
+        ./scripts/setup/nuc_setup.sh
    ```
 
 ## Security Notes
@@ -43,3 +50,4 @@ export DROID_LAPTOP_IP=172.16.0.1       # Default: 172.16.0.1
 - Never commit `.env` files to version control
 - The setup script will fail if required environment variables are not set
 - All sensitive information is now stored in environment variables, not in code
+- Prefer Option B above in shared/staging environments to minimize the env passed to root

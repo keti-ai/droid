@@ -83,6 +83,15 @@ SHELL ["micromamba", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
 # conda 툴체인을 기본 컴파일러로 고정
 ENV CONDA_PREFIX=/root/miniconda3/envs/polymetis-local
 ENV ADDR2LINE=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-addr2line
+ENV AR=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-ar
+ENV AS=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-as
+ENV LD=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-ld
+ENV NM=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-nm
+ENV OBJCOPY=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-objcopy
+ENV OBJDUMP=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-objdump
+ENV RANLIB=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-ranlib
+ENV READELF=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-readelf
+ENV STRIP=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-strip
 ENV CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
 ENV CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
 
