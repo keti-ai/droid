@@ -64,6 +64,9 @@ RUN bash -lc 'for i in 1 2 3; do \
     micromamba run -n polymetis-local pip install -e ./polymetis
 
 
+# 🔧 여기 추가 (패치/빌드 구간은 폴리메티스 소스 트리 기준으로 돌아가야 함)
+WORKDIR ${NUC_POLYMETIS_DIR}
+
 RUN conda config --remove-key channels || true && \
     conda config --add channels conda-forge && \
     conda config --add channels defaults
@@ -81,7 +84,11 @@ SHELL ["micromamba", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
 ENV CONDA_PREFIX=/root/miniconda3/envs/polymetis-local
 ENV CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
 ENV CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
-ENV LD_LIBRARY_PATH=$CONDA_PREFIX/lib:/usr/local/lib:$LD_LIBRARY_PATH
+
+# 🔧 여기서 TORCH_LIB/LD_LIBRARY_PATH 설정
+ENV TORCH_LIB=$CONDA_PREFIX/lib/python3.8/site-packages/torch/lib
+ENV LD_LIBRARY_PATH=$TORCH_LIB:$CONDA_PREFIX/lib:/usr/local/lib:$LD_LIBRARY_PATH
+
 ENV CPATH=$CONDA_PREFIX/include:$CPATH
 ENV LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
 ENV PKG_CONFIG_PATH=$CONDA_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH
@@ -124,38 +131,57 @@ for T in franka_panda_client franka_hand_client empty_statistics_client; do
 done
 PATCH
 
+RUN sed -i '/target_link_libraries(run_server/ c\
+target_link_libraries(run_server polymetis_server protobuf::libprotobuf gRPC::grpc++ absl::strings re2 generated_grpc_protos pthread)' \
+  /app/droid/fairo/polymetis/polymetis/CMakeLists.txt
+
+# protobuf 링킹 문제 해결을 위한 추가 설정
+RUN echo "export LD_LIBRARY_PATH=\$CONDA_PREFIX/lib:\$LD_LIBRARY_PATH" >> /root/.bashrc && \
+    echo "export PKG_CONFIG_PATH=\$CONDA_PREFIX/lib/pkgconfig:\$PKG_CONFIG_PATH" >> /root/.bashrc
 
 # build libfranka(0.15.2) and polymetis
 RUN ./scripts/build_libfranka.sh 0.15.2 && \
     cmake --build ./polymetis/src/clients/franka_panda_client/third_party/libfranka/build --target install && \
-    ldconfig && \
-    mkdir -p ./polymetis/build && \
-    cd ./polymetis/build && \
+    ldconfig
+
+RUN rm -rf ./polymetis/build && mkdir -p ./polymetis/build && cd ./polymetis/build && \
     cmake .. \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_CXX_STANDARD=17 \
       -DBUILD_FRANKA=ON \
-      -DBUILD_TESTS=OFF \
-      -DBUILD_DOCS=OFF \
+      -DBUILD_TORCH_ISOLATION=ON \
+      -DBUILD_TESTS=OFF -DBUILD_DOCS=OFF \
       -DFranka_DIR=/usr/local/lib/cmake/Franka \
       -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;/usr/local" \
       -DProtobuf_INCLUDE_DIR="$CONDA_PREFIX/include" \
       -DProtobuf_PROTOC_EXECUTABLE="$CONDA_PREFIX/bin/protoc" \
       -DProtobuf_USE_STATIC_LIBS=OFF \
+      -DProtobuf_LIBRARY=$CONDA_PREFIX/lib/libprotobuf.so \
+      -DProtobuf_LIBRARIES=$CONDA_PREFIX/lib/libprotobuf.so \
       -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" && \
     \
-    # 1) 필요한 라이브러리 타깃만 빌드
-    cmake --build . --target generated_grpc_protos torch_server_ops torchrot pinocchio_wrapper -j"$(nproc)" && \
+    # torch 관련 .so들 먼저 ABI 맞춰 빌드
+    cmake --build . --target torch_server_ops torchrot torchscript_pinocchio -j"$(nproc)" && \
+    cmake --install . && ldconfig && \
     \
-    # 2) 설치 (install 규칙이 있는 것만 설치되므로 클라이언트는 건드리지 않음)
-    cmake --install . && \
+    # run_server 빌드 (링크 에러 해결된 상태여야 함)
+    # protobuf 링킹 문제 해결을 위해 LDFLAGS 추가
+    LDFLAGS="-L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib" cmake --build . --target run_server -j"$(nproc)" && \
+    install -m 755 ./run_server "$CONDA_PREFIX/bin/run_server" && \
     ldconfig
+
 
 
 # set polymetis config files
 WORKDIR /app
 RUN cp ${NUC_ROBOT_CONFIG_DIR}/franka_hardware.yaml ${NUC_POLYMETIS_CONFIG_DIR}/robot_client/franka_hardware.yaml && \
     cp ${NUC_ROBOT_CONFIG_DIR}/franka_panda.yaml ${NUC_POLYMETIS_CONFIG_DIR}/robot_model/franka_panda.yaml
+# Hydra 설정에 서버 바이너리 경로/포트 주입(없으면 추가)
+RUN CFG="/app/droid/fairo/polymetis/polymetis/conf/robot_client/franka_hardware.yaml"; \
+    grep -Eq 'binary_path:|server_binary:|exec_path:' "$CFG" || \
+    printf '\nserver:\n  binary_path: "%s"\n  ip_address: "0.0.0.0"\n  port: 50051\n' "$CONDA_PREFIX/bin/run_server" >> "$CFG" && \
+    grep -nE 'binary_path|server_binary|exec_path|ip_address|port' "$CFG" || true
+
 
 # python environment setup
 RUN pip3 install -e . && \
