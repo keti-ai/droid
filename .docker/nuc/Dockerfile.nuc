@@ -82,23 +82,8 @@ SHELL ["micromamba", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
 
 # conda 툴체인을 기본 컴파일러로 고정
 ENV CONDA_PREFIX=/root/miniconda3/envs/polymetis-local
-# Set all binutils environment variables to prevent conda activation warnings
-ENV ADDR2LINE=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-addr2line
-ENV AR=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-ar
-ENV AS=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-as
-ENV CXXFILT=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-c++filt
-ENV ELFEDIT=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-elfedit
-ENV GPROF=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-gprof
-ENV LD=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-ld
-ENV LD_GOLD=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-ld.gold
-ENV NM=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-nm
-ENV OBJCOPY=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-objcopy
-ENV OBJDUMP=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-objdump
-ENV RANLIB=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-ranlib
-ENV READELF=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-readelf
-ENV SIZE=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-size
-ENV STRINGS=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-strings
-ENV STRIP=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-strip
+# Disable conda binutils activation script to prevent unbound variable errors
+RUN find /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/ -name "*binutils*" -exec rm -f {} \; || true
 ENV CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
 ENV CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
 
