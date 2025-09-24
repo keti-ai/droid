@@ -5,7 +5,7 @@ from cv2 import aruco
 nuc_ip = "172.16.0.5"
 robot_ip = "172.16.0.2"
 laptop_ip = "172.16.0.1"
-sudo_password = "keti1234"
+sudo_password = os.getenv("DROID_SUDO_PASSWORD")
 robot_type = "fr3"  # 'panda' or 'fr3'
 robot_serial_number = "309969-2543204"
 
@@ -22,7 +22,7 @@ CHARUCOBOARD_MARKER_SIZE = 0.016
 ARUCO_DICT = aruco.getPredefinedDictionary(aruco.DICT_5X5_100)
 
 # Ubuntu Pro Token (RT PATCH) #
-ubuntu_pro_token = "C12pmNBec2orFaRdXrS14sowyjUVp5"
+ubuntu_pro_token = os.getenv("DROID_UBUNTU_PRO_TOKEN")
 
 # Code Version [DONT CHANGE] #
 droid_version = "1.3"

@@ -1,1 +1,9 @@
 *.DS_Store
+
+# Environment variables with sensitive data
+.env
+.env.local
+.env.*.local
+
+# Sensitive configuration files
+**/parameters.py

@@ -57,24 +57,35 @@ else
 fi
 
 
-# Read the parameter values from the Python script using awk and convert to env variables
+# Set environment variables from parameters file
 echo -e "\nSet environment variables from parameters file\n"
 
-PARAMETERS_FILE="$(git rev-parse --show-toplevel)/droid/misc/parameters.py"
-awk -F'[[:space:]]*=[[:space:]]*' '/^[[:space:]]*([[:alnum:]_]+)[[:space:]]*=/ && $1 != "ARUCO_DICT" { gsub("\"", "", $2); print "export " $1 "=" $2 }' "$PARAMETERS_FILE" > temp_env_vars.sh
-source temp_env_vars.sh
 export ROOT_DIR=$(git rev-parse --show-toplevel)
-export NUC_IP=$nuc_ip
-export ROBOT_IP=$robot_ip
-export LAPTOP_IP=$laptop_ip
-export SUDO_PASSWORD=$sudo_password
-export ROBOT_TYPE=$robot_type
-export ROBOT_SERIAL_NUMBER=$robot_serial_number
-export HAND_CAMERA_ID=$hand_camera_id
-export VARIED_CAMERA_1_ID=$varied_camera_1_id
-export VARIED_CAMERA_2_ID=$varied_camera_2_id
-export UBUNTU_PRO_TOKEN=$ubuntu_pro_token
-rm temp_env_vars.sh
+
+# Check if required environment variables are set
+if [ -z "$DROID_SUDO_PASSWORD" ]; then
+    echo "ERROR: DROID_SUDO_PASSWORD environment variable is not set!"
+    echo "Please set it with: export DROID_SUDO_PASSWORD=your_password"
+    exit 1
+fi
+
+if [ -z "$DROID_UBUNTU_PRO_TOKEN" ]; then
+    echo "ERROR: DROID_UBUNTU_PRO_TOKEN environment variable is not set!"
+    echo "Please set it with: export DROID_UBUNTU_PRO_TOKEN=your_token"
+    exit 1
+fi
+
+# Set environment variables directly
+export NUC_IP="172.16.0.5"
+export ROBOT_IP="172.16.0.2"
+export LAPTOP_IP="172.16.0.1"
+export SUDO_PASSWORD="${DROID_SUDO_PASSWORD}"
+export ROBOT_TYPE="fr3"
+export ROBOT_SERIAL_NUMBER="309969-2543204"
+export HAND_CAMERA_ID="19133851"
+export VARIED_CAMERA_1_ID="33763137"
+export VARIED_CAMERA_2_ID="31194385"
+export UBUNTU_PRO_TOKEN="${DROID_UBUNTU_PRO_TOKEN}"
 
 if [ "$ROBOT_TYPE" == "panda" ]; then
         export LIBFRANKA_VERSION=0.9.0
