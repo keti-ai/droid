@@ -75,7 +75,7 @@ RUN conda config --remove-key channels || true && \
 
 RUN micromamba install -y -n polymetis-local -c conda-forge \
   "protobuf=3.20.*" "libprotobuf=3.20.*" "grpc-cpp<1.60" "abseil-cpp>=202301" "re2" "spdlog>=1.10" \
-  "gcc_linux-64=11.*" "gxx_linux-64=11.*" "libstdcxx-ng>=12.2" "pkg-config"
+  "gcc_linux-64=11.*" "gxx_linux-64=11.*" "libstdcxx-ng>=12.2" "pkg-config" "ccache"
 
 # 이후 RUN 들은 전부 conda env 안에서 실행 (여기서 전환)
 SHELL ["micromamba", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
@@ -106,6 +106,11 @@ ENV LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
 ENV PKG_CONFIG_PATH=$CONDA_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH
 ENV CXXFLAGS="$CXXFLAGS -I$CONDA_PREFIX/include -include cstddef"
 ENV LDFLAGS="$LDFLAGS -L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib"
+ENV CCACHE_DIR=/ccache
+ENV CCACHE_MAXSIZE=5G
+RUN ccache -o compression=true -o compiler_check=content -o hash_dir=false || true
+
+# Prefer ccache via CMake launcher; keep compilers as absolute paths
 
 # --- torch_server_ops.hpp/.cpp 패치: size_t 통일 + <cstddef> 주입 (경로 자동 탐색)
 RUN set -euo pipefail; \
@@ -175,6 +180,7 @@ RUN rm -rf ./polymetis/build && mkdir -p ./polymetis/build && cd ./polymetis/bui
       -DProtobuf_USE_STATIC_LIBS=OFF \
       -DProtobuf_LIBRARY=$CONDA_PREFIX/lib/libprotobuf.so \
       -DProtobuf_LIBRARIES=$CONDA_PREFIX/lib/libprotobuf.so \
+      -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
       -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" && \
     \
     # torch 관련 .so들 먼저 ABI 맞춰 빌드
