@@ -83,9 +83,10 @@ SHELL ["micromamba", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
 # conda 툴체인을 기본 컴파일러로 고정
 ENV CONDA_PREFIX=/root/miniconda3/envs/polymetis-local
 # Disable conda activation scripts to prevent unbound variable errors
-RUN find /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/ -name "*binutils*" -exec rm -f {} \; || true && \
-    find /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/ -name "*gcc*" -exec rm -f {} \; || true && \
-    find /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/ -name "*gxx*" -exec rm -f {} \; || true
+RUN rm -f /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/activate-binutils_linux-64.sh || true && \
+    rm -f /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/activate-gcc_linux-64.sh || true && \
+    rm -f /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/activate-gxx_linux-64.sh || true && \
+    rm -f /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/libblas_mkl_activate.sh || true
 ENV CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
 ENV CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
 ENV GXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
