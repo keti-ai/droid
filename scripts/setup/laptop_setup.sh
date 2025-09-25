@@ -7,10 +7,15 @@ function confirm_devices {
     echo "List of devices:"
     echo "$devices"
     
-    read -p "Is your oculus device connected? (y/n): " confirmation
+    # Check if any device is connected (not just "List of devices attached")
+    device_count=$(echo "$devices" | grep -c "device$" || echo "0")
     
-    if [ "$confirmation" != "y" ] && [ "$confirmation" != "Y" ]; then
-	return 1
+    if [ "$device_count" -gt 0 ]; then
+        echo "Oculus device detected automatically."
+        return 0
+    else
+        echo "No Oculus device detected."
+        return 1
     fi
 }
 
@@ -123,8 +128,26 @@ fi
 # expose parameters as environment variables
 echo -e "Set environment variables from parameters file \n"
 
-PARAMETERS_FILE="$(git rev-parse --show-toplevel)/droid/misc/parameters.py"
-awk -F'[[:space:]]*=[[:space:]]*' '/^[[:space:]]*([[:alnum:]_]+)[[:space:]]*=/ && $1 != "ARUCO_DICT" { gsub("\"", "", $2); print "export " $1 "=" $2 }' "$PARAMETERS_FILE" > temp_env_vars.sh
+# Use Python to properly load parameters with environment variables
+python3 -c "
+import os
+import sys
+sys.path.append('$(git rev-parse --show-toplevel)')
+from droid.misc.parameters import *
+
+with open('temp_env_vars.sh', 'w') as f:
+    f.write('export nuc_ip=' + str(nuc_ip) + '\n')
+    f.write('export robot_ip=' + str(robot_ip) + '\n')
+    f.write('export laptop_ip=' + str(laptop_ip) + '\n')
+    f.write('export sudo_password=' + str(sudo_password) + '\n')
+    f.write('export robot_type=' + str(robot_type) + '\n')
+    f.write('export robot_serial_number=' + str(robot_serial_number) + '\n')
+    f.write('export hand_camera_id=' + str(hand_camera_id) + '\n')
+    f.write('export varied_camera_1_id=' + str(varied_camera_1_id) + '\n')
+    f.write('export varied_camera_2_id=' + str(varied_camera_2_id) + '\n')
+    f.write('export ubuntu_pro_token=' + str(ubuntu_pro_token) + '\n')
+    f.write('export droid_version=' + str(droid_version) + '\n')
+"
 source temp_env_vars.sh
 export ROOT_DIR=$ROOT_DIR
 export NUC_IP=$nuc_ip
@@ -172,13 +195,14 @@ echo "Select an Ethernet interface to set a static IP for:"
 interfaces=$(ip -o link show | grep -Eo '^[0-9]+: (en|eth|ens|eno|enp)[a-z0-9]*' | awk -F' ' '{print $2}')
 
 # Display available interfaces for the user to choose from
-select interface_name in $interfaces; do
-    if [ -n "$interface_name" ]; then
-        break
-    else
-        echo "Invalid selection. Please choose a valid interface."
-    fi
+echo "Available interfaces:"
+for i in $interfaces; do
+    echo "- $i"
 done
+
+# Auto-select the second available interface (enx00e04c6800de)
+interface_name=$(echo $interfaces | awk '{print $2}')
+echo "Auto-selecting interface: $interface_name"
 
 echo "You've selected: $interface_name"
 
