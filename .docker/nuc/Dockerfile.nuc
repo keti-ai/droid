@@ -138,14 +138,19 @@ for T in franka_panda_client franka_hand_client empty_statistics_client; do
     if ! grep -q "target_link_libraries(${T} " "$F"; then
       # add_executable(...) 바로 다음 줄에 target_link_libraries(...) 삽입
       awk -v tgt="$T" '
-        $0 ~ "add_executable[[:space:]]*\\(" tgt "\\b" && !done {
-          print
-          print "target_link_libraries(" tgt " PRIVATE protobuf::libprotobuf gRPC::grpc++ absl::strings re2)"
+        $0 ~ "target_link_libraries[[:space:]]*\\(" tgt "\\b" && !done {
+          if (tgt == "franka_panda_client" || tgt == "franka_hand_client") {
+            print "target_link_libraries(" tgt " PRIVATE generated_grpc_protos_objs protobuf::libprotobuf gRPC::grpc++ absl::strings re2)"
+          } else {
+            print "target_link_libraries(" tgt " PRIVATE protobuf::libprotobuf gRPC::grpc++ absl::strings re2)"
+          }
           done=1
           next
         }
         { print }
-      ' "$F" > "$F.new" && mv "$F.new" "$F"
+      ' "$F" > "$F.new" && mv "$F.new" "$F" && \
+      # generated_grpc_protos를 generated_grpc_protos_objs로 교체
+      sed -i "s/generated_grpc_protos[[:space:]]*$/generated_grpc_protos_objs/g" "$F"
     fi
   fi
 done

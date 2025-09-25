@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/client/lib/rapidjson" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/client/lib/rapidjson/thirdparty/gtest" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/client/pybind11" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/client/pybind11/tools/clang" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/logging/lib/argparse" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/Server/Plugins/ChatLog" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/Server/Plugins/Core" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/Server/Plugins/ProtectionAreas" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/Tools/BlockTypePaletteGenerator/lib/lunajson" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/SQLiteCpp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/SQLiteCpp/googletest" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/TCLAP" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/cmake-coverage" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/expat" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/fmt" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/jsoncpp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/libdeflate" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/libevent" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/lua" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/luaexpat" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/luaproxy" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/mbedtls" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/sqlite" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/tolua++" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/zlib" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite_plugins/lib/lua-struct" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/perception/sandbox/polygrasp/third_party/UnseenObjectClustering" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/perception/sandbox/polygrasp/third_party/graspnet-baseline" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/polymetis/polymetis/python/polymetis/robot_drivers/psyonic_gripper/ability-hand-api" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/polymetis/polymetis/src/clients/franka_panda_client/third_party/libfranka" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/polymetis/polymetis/src/clients/franka_panda_client/third_party/libfranka/common" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/fairo/polymetis/polymetis/tests/cpp/fake_clock" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/droid/oculus_reader" vcs="Git" />
+  </component>
+</project>
