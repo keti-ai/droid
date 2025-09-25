@@ -74,26 +74,21 @@ RUN conda config --remove-key channels || true && \
 
 
 RUN micromamba install -y -n polymetis-local -c conda-forge \
-  "protobuf=3.20.*" "libprotobuf=3.20.*" "grpc-cpp<1.60" "abseil-cpp>=202301" "re2" "spdlog>=1.10" \
-  "gcc_linux-64=11.*" "gxx_linux-64=11.*" "libstdcxx-ng>=12.2" "pkg-config"
+  "protobuf=3.18.*" "libprotobuf=3.18.*" "grpc-cpp=1.41.*" "abseil-cpp=20210324.*" "re2=2021.11.*" "spdlog=1.10.*" \
+  "gcc_linux-64=11.*" "gxx_linux-64=11.*" "libstdcxx-ng>=12.2" "pkg-config" "ccache"
 
 # 이후 RUN 들은 전부 conda env 안에서 실행 (여기서 전환)
 SHELL ["micromamba", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
 
 # conda 툴체인을 기본 컴파일러로 고정
 ENV CONDA_PREFIX=/root/miniconda3/envs/polymetis-local
-ENV ADDR2LINE=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-addr2line
-ENV AR=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-ar
-ENV AS=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-as
-ENV LD=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-ld
-ENV NM=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-nm
-ENV OBJCOPY=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-objcopy
-ENV OBJDUMP=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-objdump
-ENV RANLIB=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-ranlib
-ENV READELF=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-readelf
-ENV STRIP=/root/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-strip
+# Disable conda activation scripts to prevent unbound variable errors
+RUN find /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/ -name "*binutils*" -exec rm -f {} \; || true && \
+    find /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/ -name "*gcc*" -exec rm -f {} \; || true && \
+    find /root/miniconda3/envs/polymetis-local/etc/conda/activate.d/ -name "*gxx*" -exec rm -f {} \; || true
 ENV CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
 ENV CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
+ENV GXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
 
 # protobuf 설치 검증 및 cmake 파일 확인
 RUN echo "Checking protobuf libraries:" && \
@@ -113,6 +108,11 @@ ENV LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
 ENV PKG_CONFIG_PATH=$CONDA_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH
 ENV CXXFLAGS="$CXXFLAGS -I$CONDA_PREFIX/include -include cstddef"
 ENV LDFLAGS="$LDFLAGS -L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib"
+ENV CCACHE_DIR=/ccache
+ENV CCACHE_MAXSIZE=5G
+RUN ccache -o compression=true -o compiler_check=content -o hash_dir=false || true
+
+# Prefer ccache via CMake launcher; keep compilers as absolute paths
 
 # --- torch_server_ops.hpp/.cpp 패치: size_t 통일 + <cstddef> 주입 (경로 자동 탐색)
 RUN set -euo pipefail; \
@@ -182,6 +182,7 @@ RUN rm -rf ./polymetis/build && mkdir -p ./polymetis/build && cd ./polymetis/bui
       -DProtobuf_USE_STATIC_LIBS=OFF \
       -DProtobuf_LIBRARY=$CONDA_PREFIX/lib/libprotobuf.so \
       -DProtobuf_LIBRARIES=$CONDA_PREFIX/lib/libprotobuf.so \
+      -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
       -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" && \
     \
     # torch 관련 .so들 먼저 ABI 맞춰 빌드
@@ -195,7 +196,7 @@ RUN rm -rf ./polymetis/build && mkdir -p ./polymetis/build && cd ./polymetis/bui
     echo "=== CMakeLists.txt run_server 링킹 부분 ===" && \
     grep -A 5 -B 5 "target_link_libraries(run_server" /app/droid/fairo/polymetis/polymetis/CMakeLists.txt && \
     echo "=== generated_grpc_protos 링킹 부분 ===" && \
-    grep -A 5 -B 5 "target_link_libraries(generated_grpc_protos" /app/droid/fairo/polymetis/polymetis/CMakeLists.txt && \
+    (grep -A 5 -B 5 "generated_grpc_protos" /app/droid/fairo/polymetis/polymetis/CMakeLists.txt || true) && \
     echo "=== protobuf 라이브러리 심볼 확인 ===" && \
     nm -D $CONDA_PREFIX/lib/libprotobuf.so | grep -i "InternalMetadata" | head -5 && \
     echo "=== 표준 CMake 빌드 사용 (링커에 --no-as-needed 1회 추가) ===" && \

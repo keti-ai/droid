@@ -7,6 +7,8 @@ if [ -f ~/miniconda3/etc/profile.d/conda.sh ]; then
 elif [ -f ~/anaconda3/etc/profile.d/conda.sh ]; then
   source ~/anaconda3/etc/profile.d/conda.sh
 fi
+# Some conda activation scripts (gxx) expect GXX to be set when -u is enabled
+export GXX=${GXX:-$HOME/miniconda3/envs/polymetis-local/bin/x86_64-conda-linux-gnu-c++}
 conda activate polymetis-local
 
 export CONDA_PREFIX=${CONDA_PREFIX:-$HOME/miniconda3/envs/polymetis-local}
