@@ -206,8 +206,10 @@ RUN rm -rf ./polymetis/build && mkdir -p ./polymetis/build && cd ./polymetis/bui
     echo "=== protobuf 라이브러리 심볼 확인 ===" && \
     nm -D $CONDA_PREFIX/lib/libprotobuf.so | grep -i "InternalMetadata" | head -5 && \
     echo "=== 표준 CMake 빌드 사용 (링커에 --no-as-needed 1회 추가) ===" && \
-    cmake --build . --target run_server -j"$(nproc)" && \
+    cmake --build . --target run_server franka_panda_client franka_hand_client -j"$(nproc)" && \
     install -m 755 ./run_server "$CONDA_PREFIX/bin/run_server" && \
+    install -m 755 ./franka_panda_client "$CONDA_PREFIX/bin/franka_panda_client" && \
+    install -m 755 ./franka_hand_client "$CONDA_PREFIX/bin/franka_hand_client" && \
     ldconfig
 
 
