@@ -35,5 +35,5 @@ services:
       - "/dev:/dev"
     privileged: true
     network_mode: "host"
-    gpus: all
+    # gpus: all  # GPU 비활성화
     command: python /app/scripts/main.py

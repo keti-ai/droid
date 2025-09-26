@@ -9,8 +9,13 @@ from droid.camera_utils.info import get_camera_type
 class MultiCameraWrapper:
     def __init__(self, camera_kwargs={}):
         # Open Cameras #
-        zed_cameras = gather_zed_cameras()
-        self.camera_dict = {cam.serial_number: cam for cam in zed_cameras}
+        try:
+            zed_cameras = gather_zed_cameras()
+            self.camera_dict = {cam.serial_number: cam for cam in zed_cameras}
+        except Exception as e:
+            print(f"Warning: Could not initialize ZED cameras: {e}")
+            print("Running without cameras...")
+            self.camera_dict = {}
 
         # Set Correct Parameters #
         for cam_id in self.camera_dict.keys():
@@ -75,6 +80,10 @@ class MultiCameraWrapper:
     def read_cameras(self):
         full_obs_dict = defaultdict(dict)
         full_timestamp_dict = {}
+
+        # If no cameras available, return empty dicts
+        if not self.camera_dict:
+            return full_obs_dict, full_timestamp_dict
 
         # Read Cameras In Randomized Order #
         all_cam_ids = list(self.camera_dict.keys())
