@@ -36,5 +36,4 @@ services:
     privileged: true
     network_mode: "host"
     gpus: all
-    command: >
-      bash -lc 'python /app/scripts/main.py'
+    command: python /app/scripts/main.py
