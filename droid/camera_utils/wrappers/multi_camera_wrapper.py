@@ -2,7 +2,13 @@ import os
 import random
 from collections import defaultdict
 
-from droid.camera_utils.camera_readers.zed_camera import gather_zed_cameras
+try:
+    from droid.camera_utils.camera_readers.zed_camera import gather_zed_cameras
+except ImportError as e:
+    print(f"Warning: Could not import ZED camera module: {e}")
+    print("Running without ZED cameras...")
+    def gather_zed_cameras():
+        return []
 from droid.camera_utils.info import get_camera_type
 
 
