@@ -12,7 +12,7 @@ services:
       NUC_IP: ${NUC_IP}
       ROBOT_IP: ${ROBOT_IP}
       LAPTOP_IP: ${LAPTOP_IP}
-      NVIDIA_VISIBLE_DEVICES: all
+      # NVIDIA_VISIBLE_DEVICES: all  # GPU 비활성화
       ANDROID_ADB_SERVER_ADDRESS: 127.0.0.1
       ANDROID_ADB_SERVER_PORT: 5037
     volumes:
