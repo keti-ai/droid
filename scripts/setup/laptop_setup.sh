@@ -128,26 +128,20 @@ fi
 # expose parameters as environment variables
 echo -e "Set environment variables from parameters file \n"
 
-# Use Python to properly load parameters with environment variables
-python3 -c "
-import os
-import sys
-sys.path.append('$(git rev-parse --show-toplevel)')
-from droid.misc.parameters import *
-
-with open('temp_env_vars.sh', 'w') as f:
-    f.write('export nuc_ip=' + str(nuc_ip) + '\n')
-    f.write('export robot_ip=' + str(robot_ip) + '\n')
-    f.write('export laptop_ip=' + str(laptop_ip) + '\n')
-    f.write('export sudo_password=' + str(sudo_password) + '\n')
-    f.write('export robot_type=' + str(robot_type) + '\n')
-    f.write('export robot_serial_number=' + str(robot_serial_number) + '\n')
-    f.write('export hand_camera_id=' + str(hand_camera_id) + '\n')
-    f.write('export varied_camera_1_id=' + str(varied_camera_1_id) + '\n')
-    f.write('export varied_camera_2_id=' + str(varied_camera_2_id) + '\n')
-    f.write('export ubuntu_pro_token=' + str(ubuntu_pro_token) + '\n')
-    f.write('export droid_version=' + str(droid_version) + '\n')
-"
+# Set environment variables directly (avoiding Python import issues)
+cat > temp_env_vars.sh << 'EOF'
+export nuc_ip=172.16.0.5
+export robot_ip=172.16.0.2
+export laptop_ip=172.16.0.1
+export sudo_password=keti1234
+export robot_type=fr3
+export robot_serial_number=309969-2543204
+export hand_camera_id=19133851
+export varied_camera_1_id=33763137
+export varied_camera_2_id=31194385
+export ubuntu_pro_token=C12pmNBec2orFaRdXrS14sowyjUVp5
+export droid_version=1.3
+EOF
 source temp_env_vars.sh
 export ROOT_DIR=$ROOT_DIR
 export NUC_IP=$nuc_ip
