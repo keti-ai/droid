@@ -4,8 +4,13 @@ import cv2
 
 try:
     import pyzed.sl as sl
+except ImportError as e:
+    print(f"Warning: Could not import ZED SDK: {e}")
+    print("Running without ZED recording support...")
+    sl = None
 except ModuleNotFoundError:
     print("WARNING: You have not setup the ZED cameras, and currently cannot use them")
+    sl = None
 
 resize_func_map = {"cv2": cv2.resize, None: None}
 
