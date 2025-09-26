@@ -2,7 +2,7 @@
 services:
   laptop_setup:
     # image: ghcr.io/droid-dataset/droid_laptop:${ROBOT_TYPE}
-    runtime: nvidia            # 유지
+    # runtime: nvidia            # GPU 비활성화
     environment:
       ROOT_DIR: ${ROOT_DIR}
       DISPLAY: ${DISPLAY}
