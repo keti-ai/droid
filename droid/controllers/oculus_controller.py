@@ -69,6 +69,7 @@ class VRPolicy:
             poses, buttons = self.oculus_reader.get_transformations_and_buttons()
             self._state["controller_on"] = time_since_read < num_wait_sec
             if poses == {}:
+                time.sleep(0.1)  # 짧은 대기 후 다시 시도
                 continue
 
             # Determine Control Pipeline #

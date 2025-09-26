@@ -25,8 +25,10 @@ from droid.user_interface.text import *
 
 class RobotGUI(tk.Tk):
     def __init__(self, robot=None, fullscreen=False, right_controller=True):
+        print("DEBUG: RobotGUI __init__ started")
         # Initialize #
         super().__init__()
+        print("DEBUG: RobotGUI super().__init__() completed")
         self.geometry("1500x1200")
         self.attributes("-fullscreen", fullscreen)
         self.bind("<Escape>", lambda e: self.destroy())
@@ -99,9 +101,14 @@ class RobotGUI(tk.Tk):
 
         # Start Program! #
         self.last_frame_change = 0
+        print("DEBUG: RobotGUI about to show LoginPage")
         self.show_frame(LoginPage)
+        print("DEBUG: RobotGUI LoginPage shown")
         self.update_time_index()
+        print("DEBUG: RobotGUI about to start mainloop")
+        print("DEBUG: GUI should now be visible!")
         self.mainloop()
+        print("DEBUG: RobotGUI mainloop started")
 
     def show_frame(self, frame_id, refresh_page=True, wait=False):
         if time.time() - self.last_frame_change < 0.1:
