@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # activate conda
-source ~/miniconda3/bin/activate
-conda activate robot
+source ~/miniconda3/bin/activate robot
 
 # run user command
 exec "$@"
