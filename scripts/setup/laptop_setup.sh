@@ -8,9 +8,7 @@ function confirm_devices {
     echo "$devices"
     
     # Check if any device is connected (not just "List of devices attached")
-    device_count=$(echo "$devices" | grep -c "device$" || echo "0")
-    
-    if [ "$device_count" -gt 0 ]; then
+    if echo "$devices" | grep -q "device$"; then
         echo "Oculus device detected automatically."
         return 0
     else
