@@ -37,4 +37,4 @@ services:
     network_mode: "host"
     gpus: all
     command: >
-      bash -lc 'conda run -n robot python /app/scripts/main.py'
+      bash -lc 'python /app/scripts/main.py'
