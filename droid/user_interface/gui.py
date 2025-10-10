@@ -376,23 +376,29 @@ class CalibrationPage(tk.Frame):
         how_to_text_lbl = Label(self, text=how_to_calibrate_text, font=Font(size=18))
         how_to_text_lbl.pack(pady=20)
 
-        longest_name = max([len(get_camera_name(cam_id)) for cam_id in controller.cam_ids])
+        # Handle case where no cameras are available yet
+        if len(controller.cam_ids) == 0:
+            no_cam_lbl = Label(self, text="No cameras available yet.", font=Font(size=18, slant="italic"))
+            no_cam_lbl.pack(pady=10)
+            self.button_dict = {}
+        else:
+            longest_name = max([len(get_camera_name(cam_id)) for cam_id in controller.cam_ids])
 
-        self.button_dict = {}
-        for i in range(len(controller.cam_ids)):
-            cam_id = controller.cam_ids[i]
-            cam_name = get_camera_name(cam_id)
+            self.button_dict = {}
+            for i in range(len(controller.cam_ids)):
+                cam_id = controller.cam_ids[i]
+                cam_name = get_camera_name(cam_id)
 
-            camera_btn = tk.Button(
-                self,
-                text=cam_name,
-                font=Font(size=30, weight="bold"),
-                width=longest_name,
-                command=lambda cam_idx=cam_id: self.calibrate_camera(cam_idx),
-                borderwidth=10,
-            )
-            camera_btn.place(relx=0.5, rely=0.5 + i * 0.08, anchor="n")
-            self.button_dict[cam_id] = camera_btn
+                camera_btn = tk.Button(
+                    self,
+                    text=cam_name,
+                    font=Font(size=30, weight="bold"),
+                    width=longest_name,
+                    command=lambda cam_idx=cam_id: self.calibrate_camera(cam_idx),
+                    borderwidth=10,
+                )
+                camera_btn.place(relx=0.5, rely=0.5 + i * 0.08, anchor="n")
+                self.button_dict[cam_id] = camera_btn
 
         # Back Button #
         back_btn = tk.Button(
