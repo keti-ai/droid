@@ -12,15 +12,12 @@
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/Server/Plugins/ChatLog" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/Server/Plugins/Core" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/Server/Plugins/ProtectionAreas" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/Tools/BlockTypePaletteGenerator/lib/lunajson" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/SQLiteCpp" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/SQLiteCpp/googletest" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/TCLAP" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/cmake-coverage" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/expat" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/fmt" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/jsoncpp" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/libdeflate" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/libevent" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/lua" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/droid/fairo/droidlet/lowlevel/minecraft/server/cuberite/lib/luaexpat" vcs="Git" />

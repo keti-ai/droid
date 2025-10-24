@@ -2,7 +2,7 @@
 services:
   laptop_setup:
     # image: ghcr.io/droid-dataset/droid_laptop:${ROBOT_TYPE}
-    runtime: runc               # 명시적으로 runc 사용
+    runtime: nvidia               # 명시적으로 runc 사용
     environment:
       ROOT_DIR: ${ROOT_DIR}
       DISPLAY: ${DISPLAY}
@@ -35,5 +35,5 @@ services:
       - "/dev:/dev"
     privileged: true
     network_mode: "host"
-    # gpus: all  # GPU 비활성화
+#    gpus: all  # GPU 비활성화
     command: python /app/scripts/main.py
