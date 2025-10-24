@@ -1,5 +1,8 @@
 #!/bin/bash
 
+xhost +local:root
+
+
 # Function to display devices and ask for confirmation
 function confirm_devices {
     devices=$(adb devices)
