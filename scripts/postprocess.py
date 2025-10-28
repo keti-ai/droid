@@ -34,6 +34,7 @@ from droid.postprocessing.util.validate import validate_user2id
 REGISTERED_MEMBERS: Dict[str, Dict[str, str]] = {
     "Lab Name": {
         "First Last": "4b1a56cc",
+        "KETI-IRRC": "586eb49f",
     },
 }
 validate_user2id(REGISTERED_MEMBERS)
@@ -46,6 +47,7 @@ REGISTERED_ALIASES: Dict[str, Tuple[str, str]] = {
     # Note: Add duplicates/typos below (follow format)!
     **{
         "Firstt Last": ("Lab Name", "First Last"),
+        "Yonghyeok Seo": ("Lab Name", "KETI-IRRC"),
     }
 }
 # fmt: on
