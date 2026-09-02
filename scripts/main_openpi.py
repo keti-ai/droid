@@ -161,28 +161,35 @@ def main(args: Args):
         save_filename = "video_" + timestamp
         ImageSequenceClip(list(video), fps=10).write_videofile(save_filename + ".mp4", codec="libx264")
 
-        success: str | float | None = None
-        while not isinstance(success, float):
-            success = input(
+        success: float | None = None
+        while success is None:
+            success_input = input(
                 "Did the rollout succeed? (enter y for 100%, n for 0%), or a numeric value 0-100 based on the evaluation spec"
-            )
-            if success == "y":
-                success = 1.0
-            elif success == "n":
-                success = 0.0
+            ).strip().lower()
+            if success_input == "y":
+                success_percent = 100.0
+            elif success_input == "n":
+                success_percent = 0.0
+            else:
+                try:
+                    success_percent = float(success_input)
+                except ValueError:
+                    print(f"Success must be y, n, or a number in [0, 100], but got: {success_input}")
+                    continue
 
-            success = float(success) / 100
-            if not (0 <= success <= 1):
-                print(f"Success must be a number in [0, 100] but got: {success * 100}")
+            if not (0 <= success_percent <= 100):
+                print(f"Success must be a number in [0, 100] but got: {success_percent}")
+                continue
+            success = success_percent / 100
 
-        df = df.append(
-            {
-                "success": success,
-                "duration": t_step,
-                "video_filename": save_filename,
-            },
-            ignore_index=True,
-        )
+        # ---- pandas 2.x: append 제거 → df.loc[...] 방식으로 대체 ----
+        df.loc[len(df)] = {
+            "success": success,
+            "duration": t_step,
+            "video_filename": save_filename,
+        }
+        # -------------------------------------------------------------
+
 
         if input("Do one more eval? (enter y or n) ").lower() != "y":
             break
